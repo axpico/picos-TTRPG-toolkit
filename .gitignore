@@ -1,0 +1,29 @@
+node_modules/
+dist/
+build/
+.vite/
+.cache/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# runtime data
+apps/server/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# logs
+*.log
+npm-debug.log*
+
+# editor
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+.claude

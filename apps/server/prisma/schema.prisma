@@ -1,0 +1,269 @@
+// Prisma schema for Pico's TTRPG Toolkit. SQLite has no native JSON, so all
+// JSON-shaped columns are stored as TEXT and validated with zod at the
+// repository layer on both read and write.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Settings {
+  id           Int    @id @default(1)
+  passwordHash String
+  theme        String @default("dark")
+}
+
+model Campaign {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  tagsJson    String   @default("[]")
+  shareToken  String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  layout       Layout?
+  sessions     Session[]
+  party        PartyMember[]
+  npcs         NPC[]
+  monsters     Monster[]
+  locations    Location[]
+  shops        Shop[]
+  encounters   Encounter[]
+  calendar     Calendar?
+  weather      Weather?
+  log          LogEntry[]
+  notes        StickyNote[]
+  diceRolls    DiceRoll[]
+  broadcasts   Broadcast[]
+}
+
+model Layout {
+  id            String   @id @default(cuid())
+  campaignId    String   @unique
+  campaign      Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  itemsJson     String   @default("[]")
+  viewportX     Float    @default(0)
+  viewportY     Float    @default(0)
+  viewportScale Float    @default(1)
+  updatedAt     DateTime @updatedAt
+}
+
+model Broadcast {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  widgetKey  String
+  active     Boolean  @default(false)
+  payloadJson String  @default("{}")
+  updatedAt  DateTime @updatedAt
+
+  @@unique([campaignId, widgetKey])
+}
+
+model Asset {
+  id        String   @id @default(cuid())
+  filename  String
+  mime      String
+  size      Int
+  createdAt DateTime @default(now())
+}
+
+model PartyMember {
+  id              String   @id @default(cuid())
+  campaignId      String
+  campaign        Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name            String
+  playerName      String?
+  hp              Int      @default(0)
+  hpMax           Int      @default(0)
+  status          String   @default("active") // active|down|stable|dead
+  conditionsJson  String   @default("[]")
+  notes           String?
+  portraitAssetId String?
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([campaignId, order])
+}
+
+model Session {
+  id                String   @id @default(cuid())
+  campaignId        String
+  campaign          Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  title             String
+  date              DateTime?
+  summary           String?
+  notes             String?  // markdown body
+  externalLinksJson String   @default("[]")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([campaignId, date])
+}
+
+model NPC {
+  id              String     @id @default(cuid())
+  campaignId      String?
+  campaign        Campaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  name            String
+  role            String?
+  quirk           String?
+  hook            String?
+  notes           String?
+  tagsJson        String     @default("[]")
+  portraitAssetId String?
+  favorite        Boolean    @default(false)
+  locationId      String?
+  location        Location?  @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model Monster {
+  id          String   @id @default(cuid())
+  campaignId  String?
+  campaign    Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  name        String
+  type        String?
+  environment String?
+  challenge   String?
+  statsJson   String   @default("{}")
+  notes       String?
+  tagsJson    String   @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Location {
+  id           String   @id @default(cuid())
+  campaignId   String
+  campaign     Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  gmNotes      String?
+  playerNotes  String?
+  imageAssetId String?
+  pinsJson     String   @default("[]")
+  // Polygon/rect fog-of-war reveals; player view subtracts hidden, then composites.
+  revealsJson  String   @default("[]")
+  npcs         NPC[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Shop {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name       String
+  notes      String?
+  items      ShopItem[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model ShopItem {
+  id        String   @id @default(cuid())
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name      String
+  type      String?
+  price     Float?
+  stock     Int?
+  rarity    String?
+  tagsJson  String   @default("[]")
+}
+
+model Encounter {
+  id          String   @id @default(cuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name        String
+  round       Int      @default(1)
+  currentTurn Int      @default(0)
+  active      Boolean  @default(false)
+  combatants  Combatant[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Combatant {
+  id             String    @id @default(cuid())
+  encounterId    String
+  encounter      Encounter @relation(fields: [encounterId], references: [id], onDelete: Cascade)
+  name           String
+  initiative     Int
+  hp             Int?
+  hpMax          Int?
+  conditionsJson String    @default("[]")
+  notes          String?
+  isPC           Boolean   @default(false)
+  order          Int       @default(0)
+}
+
+model Calendar {
+  id            String   @id @default(cuid())
+  campaignId    String   @unique
+  campaign      Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  // { monthNames: [...], daysPerMonth: [n,n,...], weekdayNames: [...] }
+  definitionJson String  @default("{}")
+  currentYear   Int      @default(1)
+  currentMonth  Int      @default(1)
+  currentDay    Int      @default(1)
+  currentHour   Int      @default(8)
+  currentMinute Int      @default(0)
+}
+
+model Weather {
+  id          String   @id @default(cuid())
+  campaignId  String   @unique
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  // { condition, temperature, description }
+  currentJson String   @default("{}")
+  tableJson   String?
+}
+
+model LogEntry {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  kind       String
+  message    String
+  dataJson   String?
+  createdAt  DateTime @default(now())
+
+  @@index([campaignId, createdAt])
+}
+
+model StickyNote {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  text       String
+  color      String   @default("#fde68a")
+  x          Float    @default(0)
+  y          Float    @default(0)
+  width      Float    @default(220)
+  height     Float    @default(160)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model DiceRoll {
+  id            String   @id @default(cuid())
+  campaignId    String?
+  campaign      Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  notation      String
+  result        Int
+  breakdownJson String
+  label         String?
+  createdAt     DateTime @default(now())
+
+  @@index([campaignId, createdAt])
+}
