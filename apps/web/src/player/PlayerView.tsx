@@ -1,6 +1,14 @@
 import { useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import type { Broadcast, Calendar, Encounter, PartyMember, PartyMemberStatus, Weather } from "@toolkit/shared";
+import type {
+  Broadcast,
+  Calendar,
+  Encounter,
+  PartyMember,
+  PartyMemberStatus,
+  PublicLocation,
+  Weather,
+} from "@toolkit/shared";
 import { api } from "../api/client.js";
 import { useBroadcast } from "../hooks/useBroadcast.js";
 import clsx from "clsx";
@@ -13,6 +21,7 @@ interface PlayerState {
     combat: Encounter | null;
     weather: Weather | null;
     calendar: Calendar | null;
+    map: PublicLocation | null;
   };
 }
 
@@ -103,6 +112,8 @@ export function PlayerView() {
         </section>
       )}
 
+      {s.data.map && <MapSection map={s.data.map} />}
+
       {s.data.weather && (
         <section className="card mb-4 p-4">
           <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-ink-300">
@@ -187,5 +198,105 @@ export function PlayerView() {
         </section>
       )}
     </div>
+  );
+}
+
+/**
+ * Renders the broadcasted map. Pins are pre-filtered server-side (hidden pins
+ * are stripped before sending to the player). Reveals are rectangular cutouts
+ * in a black overlay — when there are no reveals, the full map shows.
+ */
+function MapSection({ map }: { map: PublicLocation }) {
+  const hasReveals = map.reveals.some((r) => r.mode === "reveal");
+  return (
+    <section className="card mb-4 overflow-hidden">
+      <header className="border-b border-ink-700 px-4 py-2">
+        <h2 className="text-sm font-medium uppercase tracking-wide text-ink-300">
+          {map.name}
+        </h2>
+        {map.playerNotes && (
+          <p className="mt-1 text-sm text-ink-200">{map.playerNotes}</p>
+        )}
+      </header>
+      {map.imageUrl ? (
+        <div className="relative inline-block max-w-full">
+          <img
+            src={map.imageUrl}
+            alt={map.name}
+            draggable={false}
+            className="block max-w-full"
+          />
+          {/* Fog-of-war: black overlay with reveal/hide cutouts. */}
+          {hasReveals && (
+            <svg
+              className="pointer-events-none absolute inset-0 h-full w-full"
+              viewBox="0 0 1 1"
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <mask id="fog-mask" maskContentUnits="objectBoundingBox">
+                  {/* Start opaque (everything obscured). */}
+                  <rect x="0" y="0" width="1" height="1" fill="white" />
+                  {/* Reveal rectangles cut holes (black = transparent in mask). */}
+                  {map.reveals
+                    .filter((r) => r.mode === "reveal")
+                    .map((r) => (
+                      <rect
+                        key={r.id}
+                        x={r.x}
+                        y={r.y}
+                        width={r.w}
+                        height={r.h}
+                        fill="black"
+                      />
+                    ))}
+                  {/* Hide rectangles cover previously revealed areas. */}
+                  {map.reveals
+                    .filter((r) => r.mode === "hide")
+                    .map((r) => (
+                      <rect
+                        key={r.id}
+                        x={r.x}
+                        y={r.y}
+                        width={r.w}
+                        height={r.h}
+                        fill="white"
+                      />
+                    ))}
+                </mask>
+              </defs>
+              <rect
+                x="0"
+                y="0"
+                width="1"
+                height="1"
+                fill="rgba(0,0,0,0.92)"
+                mask="url(#fog-mask)"
+              />
+            </svg>
+          )}
+          {/* Pins on top of fog. */}
+          {map.pins.map((p) => (
+            <div
+              key={p.id}
+              className="absolute -translate-x-1/2 -translate-y-1/2"
+              style={{ left: `${p.x * 100}%`, top: `${p.y * 100}%` }}
+            >
+              <div
+                className="h-4 w-4 rounded-full border-2 border-black/70 shadow"
+                style={{ backgroundColor: p.color }}
+              />
+              {p.label && (
+                <span className="absolute left-4 top-0 whitespace-nowrap rounded bg-black/70 px-1.5 py-0.5 text-xs text-white">
+                  {p.label}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="p-6 text-center text-sm text-ink-400">No map image.</div>
+      )}
+    </section>
   );
 }

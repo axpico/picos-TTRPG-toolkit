@@ -15,3 +15,5 @@ export * from "./log.js";
 export * from "./broadcast.js";
 export * from "./sse.js";
 export * from "./dice.js";
+export * from "./location.js";
+export * from "./sticky.js";

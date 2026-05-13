@@ -19,6 +19,10 @@ import { calendarRoutes } from "./routes/calendar.js";
 import { logRoutes } from "./routes/log.js";
 import { streamRoutes } from "./routes/stream.js";
 import { playerRoutes } from "./routes/player.js";
+import { fileReadRoutes, fileUploadRoutes } from "./routes/files.js";
+import { adminRoutes } from "./routes/admin.js";
+import { locationRoutes } from "./routes/location.js";
+import { stickyRoutes } from "./routes/sticky.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -41,6 +45,10 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Player-facing read-only endpoints (gated by share token, not session).
   await app.register(playerRoutes, { prefix: "/api/player" });
 
+  // Asset retrieval is intentionally public — IDs are UUIDs and the player view
+  // needs to load maps/portraits without a session cookie.
+  await app.register(fileReadRoutes, { prefix: "/api/files" });
+
   // GM endpoints (everything else requires session).
   await app.register(async (gm) => {
     gm.addHook("preHandler", gm.requireGm);
@@ -57,7 +65,11 @@ export async function buildApp(): Promise<FastifyInstance> {
     await gm.register(weatherRoutes, { prefix: "/api/campaigns" });
     await gm.register(calendarRoutes, { prefix: "/api/campaigns" });
     await gm.register(logRoutes, { prefix: "/api/campaigns" });
+    await gm.register(locationRoutes, { prefix: "/api/campaigns" });
+    await gm.register(stickyRoutes, { prefix: "/api/campaigns" });
     await gm.register(streamRoutes, { prefix: "/api/stream" });
+    await gm.register(fileUploadRoutes, { prefix: "/api/uploads" });
+    await gm.register(adminRoutes, { prefix: "/api/admin" });
   });
 
   app.get("/api/health", async () => ({ ok: true, env: env.NODE_ENV }));

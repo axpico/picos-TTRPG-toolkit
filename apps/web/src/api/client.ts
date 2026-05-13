@@ -34,10 +34,32 @@ function safeJsonParse(text: string): unknown {
   }
 }
 
+async function upload<T>(path: string, file: File): Promise<T> {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  const res = await fetch(path, {
+    method: "POST",
+    credentials: "include",
+    body: form,
+  });
+  const text = await res.text();
+  const data: unknown = text ? safeJsonParse(text) : undefined;
+  if (!res.ok) {
+    const envelope = (data as { error?: { code?: string; message?: string } })?.error;
+    const err: ApiError = Object.assign(new Error(envelope?.message ?? res.statusText), {
+      status: res.status,
+      code: envelope?.code,
+    });
+    throw err;
+  }
+  return data as T;
+}
+
 export const api = {
   get: <T,>(path: string) => request<T>("GET", path),
   post: <T,>(path: string, body?: unknown) => request<T>("POST", path, body),
   put: <T,>(path: string, body?: unknown) => request<T>("PUT", path, body),
   patch: <T,>(path: string, body?: unknown) => request<T>("PATCH", path, body),
   delete: <T = void,>(path: string) => request<T>("DELETE", path),
+  upload,
 };

@@ -43,6 +43,13 @@ export function useBroadcast({ url, campaignId, onEvent }: Options) {
       if (event.type.startsWith("log.")) {
         qc.invalidateQueries({ queryKey: ["log", campaignId] });
       }
+      if (event.type.startsWith("location.")) {
+        qc.invalidateQueries({ queryKey: ["locations", campaignId] });
+        qc.invalidateQueries({ queryKey: ["player", campaignId] });
+      }
+      if (event.type.startsWith("sticky.")) {
+        qc.invalidateQueries({ queryKey: ["sticky", campaignId] });
+      }
       if (event.type === "broadcast.change") {
         qc.invalidateQueries({ queryKey: ["broadcasts", campaignId] });
         qc.invalidateQueries({ queryKey: ["player", campaignId] });
@@ -84,6 +91,9 @@ export function useBroadcast({ url, campaignId, onEvent }: Options) {
       "log.append",
       "broadcast.change",
       "campaign.update",
+      "location.update",
+      "sticky.update",
+      "sticky.delete",
     ];
     for (const t of eventTypes) source.addEventListener(t, onCustom as EventListener);
 

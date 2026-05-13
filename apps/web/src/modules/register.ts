@@ -9,3 +9,4 @@ import "./weather/Widget.js";
 import "./calendar/Widget.js";
 import "./log/Widget.js";
 import "./dice/Widget.js";
+import "./map/Widget.js";

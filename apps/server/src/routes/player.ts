@@ -6,6 +6,7 @@ import { toEncounterDto } from "../lib/repos/combat.js";
 import { toWeatherDto } from "../lib/repos/weather.js";
 import { toCalendarDto } from "../lib/repos/calendar.js";
 import { toBroadcastDto } from "../lib/repos/broadcast.js";
+import { toPublicLocation } from "../lib/repos/location.js";
 import { openSse } from "../plugins/sse.js";
 import type { SSEEvent } from "@toolkit/shared";
 
@@ -29,8 +30,25 @@ export const playerRoutes: FastifyPluginAsync = async (app) => {
       return;
     }
 
-    const [broadcasts, party, activeEncounter, weatherRow, calendarRow] = await Promise.all([
-      prisma.broadcast.findMany({ where: { campaignId, active: true } }),
+    const broadcasts = await prisma.broadcast.findMany({
+      where: { campaignId, active: true },
+    });
+    const active = new Set(broadcasts.map((b) => b.widgetKey));
+
+    // Resolve the broadcasted map's locationId from its payload (set by the
+    // Map widget when the GM picks an active location).
+    const mapBroadcast = broadcasts.find((b) => b.widgetKey === "map:current");
+    let mapLocationId: string | null = null;
+    if (mapBroadcast) {
+      try {
+        const payload = JSON.parse(mapBroadcast.payloadJson) as { locationId?: string };
+        if (typeof payload.locationId === "string") mapLocationId = payload.locationId;
+      } catch {
+        /* malformed payload, ignore */
+      }
+    }
+
+    const [party, activeEncounter, weatherRow, calendarRow, mapRow] = await Promise.all([
       prisma.partyMember.findMany({
         where: { campaignId },
         orderBy: [{ order: "asc" }, { createdAt: "asc" }],
@@ -42,9 +60,11 @@ export const playerRoutes: FastifyPluginAsync = async (app) => {
       }),
       prisma.weather.findUnique({ where: { campaignId } }),
       prisma.calendar.findUnique({ where: { campaignId } }),
+      mapLocationId
+        ? prisma.location.findUnique({ where: { id: mapLocationId } })
+        : Promise.resolve(null),
     ]);
 
-    const active = new Set(broadcasts.map((b) => b.widgetKey));
     return {
       campaign: { id: campaign.id, name: campaign.name },
       broadcasts: broadcasts.map(toBroadcastDto),
@@ -56,6 +76,10 @@ export const playerRoutes: FastifyPluginAsync = async (app) => {
         weather: active.has("weather") && weatherRow ? toWeatherDto(weatherRow) : null,
         calendar:
           active.has("calendar") && calendarRow ? toCalendarDto(calendarRow) : null,
+        map:
+          active.has("map:current") && mapRow && mapRow.campaignId === campaignId
+            ? toPublicLocation(mapRow)
+            : null,
       },
     };
   });

@@ -7,6 +7,7 @@ import { InfiniteCanvas } from "../canvas/InfiniteCanvas.js";
 import { listWidgets } from "../canvas/WidgetRegistry.js";
 import { useCanvasStore } from "../canvas/store.js";
 import { useBroadcast } from "../hooks/useBroadcast.js";
+import { useCreateStickyNote } from "../modules/sticky/api.js";
 import "../modules/register.js";
 
 function uid() {
@@ -19,6 +20,7 @@ export function CampaignDashboard() {
   const logout = useLogout();
   const layoutSync = useLayoutSync(campaignId);
   const upsertItem = useCanvasStore((s) => s.upsertItem);
+  const createSticky = useCreateStickyNote(campaignId);
   const navigate = useNavigate();
   const rotate = useRotateShareToken();
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -38,13 +40,18 @@ export function CampaignDashboard() {
   const c = campaign.data!;
   const playerUrl = `${window.location.origin}/player/${c.id}?t=${c.shareToken}`;
 
+  const dropOrigin = () => {
+    const viewport = useCanvasStore.getState().layout.viewport;
+    return {
+      x: -viewport.x / viewport.scale + 80,
+      y: -viewport.y / viewport.scale + 80,
+    };
+  };
+
   const addWidget = (type: string) => {
     const def = listWidgets().find((d) => d.type === type);
     if (!def) return;
-    const viewport = useCanvasStore.getState().layout.viewport;
-    // Drop new widgets at viewport centerish.
-    const x = -viewport.x / viewport.scale + 80;
-    const y = -viewport.y / viewport.scale + 80;
+    const { x, y } = dropOrigin();
     upsertItem({
       instanceId: uid(),
       moduleType: type,
@@ -57,6 +64,11 @@ export function CampaignDashboard() {
     setShowAddMenu(false);
   };
 
+  const addSticky = () => {
+    const { x, y } = dropOrigin();
+    createSticky.mutate({ x, y });
+  };
+
   return (
     <div className="flex h-screen flex-col bg-ink-950 text-ink-50">
       <header className="z-10 flex items-center justify-between border-b border-ink-800 bg-ink-900 px-4 py-2">
@@ -65,6 +77,13 @@ export function CampaignDashboard() {
           <h1 className="text-sm font-semibold">{c.name}</h1>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            className="btn-ghost"
+            onClick={addSticky}
+            title="Drop a sticky note on the canvas"
+          >
+            + Sticky
+          </button>
           <div className="relative">
             <button className="btn-primary" onClick={() => setShowAddMenu((v) => !v)}>
               + Add widget
