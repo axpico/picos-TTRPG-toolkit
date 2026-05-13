@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import type { GeneratedNpc, NPC } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
+import { InlineConfirm } from "../shared.js";
 import {
   useCreateNpc,
   useDeleteNpc,
@@ -9,6 +10,15 @@ import {
   useNpcs,
   useUpdateNpc,
 } from "./api.js";
+
+const CULTURES = [
+  { value: "", label: "Any culture" },
+  { value: "generic", label: "Generic" },
+  { value: "northern", label: "Northern" },
+  { value: "desert", label: "Desert" },
+  { value: "imperial", label: "Imperial" },
+  { value: "spacer", label: "Spacer / sci-fi" },
+] as const;
 
 type Tab = "library" | "generator";
 
@@ -20,13 +30,13 @@ function NpcLibraryWidget({ campaignId, state, setState }: WidgetContext) {
     <div className="flex h-full flex-col">
       <nav className="flex gap-1 border-b border-ink-700 px-2 py-1.5 text-sm">
         <button
-          className={clsx("btn px-2", tab === "library" ? "btn-primary" : "btn-ghost")}
+          className={clsx("btn px-3", tab === "library" ? "btn-primary" : "btn-ghost")}
           onClick={() => setTab("library")}
         >
           Library
         </button>
         <button
-          className={clsx("btn px-2", tab === "generator" ? "btn-primary" : "btn-ghost")}
+          className={clsx("btn px-3", tab === "generator" ? "btn-primary" : "btn-ghost")}
           onClick={() => setTab("generator")}
         >
           Generator
@@ -63,7 +73,7 @@ function LibraryTab({ campaignId }: { campaignId: string }) {
       <div className="flex items-center gap-1 border-b border-ink-700 px-2 py-1.5">
         <input
           className="input flex-1"
-          placeholder="Search name/role/notes…"
+          placeholder="Search name / role / notes…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
@@ -75,19 +85,27 @@ function LibraryTab({ campaignId }: { campaignId: string }) {
           <option value="campaign">This campaign</option>
           <option value="all">All</option>
         </select>
-        <label className="flex items-center gap-1 text-xs text-ink-300">
+        <label
+          className={clsx(
+            "flex cursor-pointer items-center gap-1 rounded-md border px-2 py-1 text-xs select-none transition-colors",
+            onlyFavorites
+              ? "border-amber-600 bg-amber-700/30 text-amber-200"
+              : "border-ink-700 text-ink-400 hover:bg-ink-800",
+          )}
+          title="Show favorites only"
+        >
           <input
             type="checkbox"
+            className="sr-only"
             checked={onlyFavorites}
             onChange={(e) => setOnlyFavorites(e.target.checked)}
           />
-          ★
+          ★ Faves
         </label>
         <button
           className="btn-primary px-2"
-          onClick={() =>
-            create.mutate({ name: "New NPC", campaignId, tags: [] })
-          }
+          onClick={() => create.mutate({ name: "New NPC", campaignId, tags: [] })}
+          title="New NPC"
         >
           +
         </button>
@@ -99,95 +117,128 @@ function LibraryTab({ campaignId }: { campaignId: string }) {
             key={n.id}
             npc={n}
             onChange={(input) => update.mutate({ id: n.id, input })}
-            onDelete={() => {
-              if (confirm(`Delete NPC "${n.name}"?`)) remove.mutate(n.id);
-            }}
+            onDelete={() => remove.mutate(n.id)}
           />
         ))}
         {list.data?.length === 0 && (
-          <li className="text-ink-400">No NPCs match your filters.</li>
+          <li className="py-6 text-center text-ink-500">No NPCs match your filters.</li>
         )}
       </ul>
     </div>
   );
 }
 
-interface RowProps {
+interface NpcRowProps {
   npc: NPC;
   onChange: (input: Parameters<ReturnType<typeof useUpdateNpc>["mutate"]>[0]["input"]) => void;
   onDelete: () => void;
 }
 
-function NpcRow({ npc, onChange, onDelete }: RowProps) {
+function NpcRow({ npc, onChange, onDelete }: NpcRowProps) {
   const [open, setOpen] = useState(false);
+  const [localName, setLocalName] = useState(npc.name);
+  const [localRole, setLocalRole] = useState(npc.role ?? "");
+
+  useEffect(() => setLocalName(npc.name), [npc.name]);
+  useEffect(() => setLocalRole(npc.role ?? ""), [npc.role]);
+
   return (
     <li className="rounded-md border border-ink-700 bg-ink-900">
-      <div className="flex items-center gap-2 px-2 py-1.5">
+      <div className="flex items-center gap-1.5 px-2 py-1.5">
         <button
-          className="text-ink-500 hover:text-ink-200"
+          className="text-ink-500 hover:text-ink-200 shrink-0"
           onClick={() => setOpen((v) => !v)}
           title={open ? "Collapse" : "Expand"}
         >
           {open ? "▾" : "▸"}
         </button>
         <input
-          className="input flex-1"
-          value={npc.name}
-          onChange={(e) => onChange({ name: e.target.value })}
+          className="input flex-1 font-medium"
+          value={localName}
+          onChange={(e) => setLocalName(e.target.value)}
+          onBlur={() => localName !== npc.name && onChange({ name: localName })}
+          placeholder="Name"
         />
         <input
-          className="input w-32"
+          className="input w-28 text-xs text-ink-300"
           placeholder="Role"
-          value={npc.role ?? ""}
-          onChange={(e) => onChange({ role: e.target.value || undefined })}
+          value={localRole}
+          onChange={(e) => setLocalRole(e.target.value)}
+          onBlur={() => (localRole || undefined) !== (npc.role ?? undefined) && onChange({ role: localRole || undefined })}
         />
         <button
           className={clsx(
-            "btn h-7 px-2",
-            npc.favorite ? "bg-amber-700 text-amber-100" : "bg-ink-700 text-ink-200",
+            "btn h-7 w-7 shrink-0 p-0 text-sm transition-colors",
+            npc.favorite
+              ? "bg-amber-700/60 text-amber-200"
+              : "bg-ink-800 text-ink-500 hover:text-amber-300",
           )}
           onClick={() => onChange({ favorite: !npc.favorite })}
-          title="Favorite"
+          title={npc.favorite ? "Unfavorite" : "Favorite"}
         >
           ★
         </button>
-        <button className="btn-ghost px-2" onClick={onDelete} title="Delete">
-          ×
-        </button>
+        <InlineConfirm onConfirm={onDelete} title="Delete NPC" />
       </div>
+
+      {/* Tag chips in collapsed view */}
+      {!open && npc.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1 px-7 pb-1.5">
+          {npc.tags.map((t) => (
+            <span key={t} className="chip">
+              {t}
+            </span>
+          ))}
+        </div>
+      )}
+
       {open && (
-        <div className="space-y-1.5 border-t border-ink-700 px-2 py-2 text-xs">
-          <input
-            className="input"
-            placeholder="Quirk"
-            value={npc.quirk ?? ""}
-            onChange={(e) => onChange({ quirk: e.target.value || undefined })}
-          />
-          <input
-            className="input"
-            placeholder="Hook"
-            value={npc.hook ?? ""}
-            onChange={(e) => onChange({ hook: e.target.value || undefined })}
-          />
-          <textarea
-            className="input min-h-[80px]"
-            placeholder="Notes"
-            value={npc.notes ?? ""}
-            onChange={(e) => onChange({ notes: e.target.value || undefined })}
-          />
-          <input
-            className="input"
-            placeholder="Tags (comma-separated)"
-            value={npc.tags.join(", ")}
-            onChange={(e) =>
-              onChange({
-                tags: e.target.value
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean),
-              })
-            }
-          />
+        <div className="space-y-1.5 border-t border-ink-700 px-3 py-2 text-xs">
+          <div className="grid grid-cols-2 gap-1.5">
+            <div>
+              <label className="mb-0.5 block text-ink-400">Quirk</label>
+              <input
+                className="input"
+                placeholder="A distinctive trait…"
+                defaultValue={npc.quirk ?? ""}
+                onBlur={(e) => onChange({ quirk: e.target.value || undefined })}
+              />
+            </div>
+            <div>
+              <label className="mb-0.5 block text-ink-400">Hook</label>
+              <input
+                className="input"
+                placeholder="A plot hook…"
+                defaultValue={npc.hook ?? ""}
+                onBlur={(e) => onChange({ hook: e.target.value || undefined })}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-0.5 block text-ink-400">Notes</label>
+            <textarea
+              className="input min-h-[70px]"
+              placeholder="GM notes…"
+              defaultValue={npc.notes ?? ""}
+              onBlur={(e) => onChange({ notes: e.target.value || undefined })}
+            />
+          </div>
+          <div>
+            <label className="mb-0.5 block text-ink-400">Tags</label>
+            <input
+              className="input"
+              placeholder="tag1, tag2…"
+              defaultValue={npc.tags.join(", ")}
+              onBlur={(e) =>
+                onChange({
+                  tags: e.target.value
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean),
+                })
+              }
+            />
+          </div>
         </div>
       )}
     </li>
@@ -202,88 +253,111 @@ function GeneratorTab({ campaignId }: { campaignId: string }) {
   const [role, setRole] = useState("");
   const [count, setCount] = useState(3);
   const [results, setResults] = useState<GeneratedNpc[]>([]);
+  const [saved, setSaved] = useState<Set<number>>(new Set());
 
-  const roll = () =>
+  const roll = () => {
+    setSaved(new Set());
     generate.mutate(
-      {
-        culture: culture || undefined,
-        region: region || undefined,
-        role: role || undefined,
-        count,
-      },
+      { culture: culture || undefined, region: region || undefined, role: role || undefined, count },
       { onSuccess: (r) => setResults(r.npcs) },
     );
+  };
+
+  const save = (n: GeneratedNpc, idx: number) => {
+    create.mutate(
+      { name: n.name, role: n.role, quirk: n.quirk, hook: n.hook, tags: n.tags, campaignId },
+      { onSuccess: () => setSaved((prev) => new Set(prev).add(idx)) },
+    );
+  };
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden p-2 text-sm">
+    <div className="flex flex-1 flex-col overflow-hidden p-3 text-sm">
       <div className="grid grid-cols-2 gap-1.5">
-        <input
-          className="input"
-          placeholder="Culture (generic|northern|desert|imperial|spacer)"
-          value={culture}
-          onChange={(e) => setCulture(e.target.value)}
-        />
-        <input
-          className="input"
-          placeholder="Region tag (optional)"
-          value={region}
-          onChange={(e) => setRegion(e.target.value)}
-        />
-        <input
-          className="input"
-          placeholder="Force role (optional)"
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-        />
-        <input
-          type="number"
-          className="input"
-          min={1}
-          max={20}
-          value={count}
-          onChange={(e) => setCount(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
-        />
+        <div>
+          <label className="mb-0.5 block text-xs text-ink-400">Culture</label>
+          <select
+            className="input"
+            value={culture}
+            onChange={(e) => setCulture(e.target.value)}
+          >
+            {CULTURES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-0.5 block text-xs text-ink-400">Region tag</label>
+          <input
+            className="input"
+            placeholder="e.g. riverside, slums…"
+            value={region}
+            onChange={(e) => setRegion(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="mb-0.5 block text-xs text-ink-400">Force role</label>
+          <input
+            className="input"
+            placeholder="e.g. innkeeper…"
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="mb-0.5 block text-xs text-ink-400">Count</label>
+          <input
+            type="number"
+            className="input"
+            min={1}
+            max={20}
+            value={count}
+            onChange={(e) => setCount(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+          />
+        </div>
       </div>
       <button
         className="btn-primary mt-2"
         onClick={roll}
         disabled={generate.isPending}
       >
-        Roll NPCs
+        {generate.isPending ? "Rolling…" : "Roll NPCs"}
       </button>
 
-      <ul className="mt-2 flex-1 space-y-1.5 overflow-auto">
+      <ul className="mt-3 flex-1 space-y-2 overflow-auto">
         {results.map((n, idx) => (
           <li
             key={idx}
-            className="flex flex-col gap-1 rounded-md border border-ink-700 bg-ink-900 px-2 py-1.5"
+            className={clsx(
+              "flex flex-col gap-1.5 rounded-md border px-2 py-2",
+              saved.has(idx) ? "border-emerald-700/50 bg-emerald-900/10" : "border-ink-700 bg-ink-900",
+            )}
           >
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <span className="font-medium">
-                {n.name} <span className="text-ink-400">— {n.role}</span>
+                {n.name}{" "}
+                <span className="text-xs font-normal text-ink-400">— {n.role}</span>
               </span>
               <button
-                className="btn-ghost h-7 px-2 text-xs"
-                onClick={() =>
-                  create.mutate({
-                    name: n.name,
-                    role: n.role,
-                    quirk: n.quirk,
-                    hook: n.hook,
-                    tags: n.tags,
-                    campaignId,
-                  })
-                }
+                className={clsx(
+                  "btn h-6 shrink-0 px-2 text-xs",
+                  saved.has(idx) ? "btn-ghost text-emerald-400" : "btn-ghost",
+                )}
+                onClick={() => save(n, idx)}
+                disabled={saved.has(idx)}
               >
-                Save to library
+                {saved.has(idx) ? "✓ Saved" : "Save"}
               </button>
             </div>
-            <div className="text-xs text-ink-300">
+            <div className="grid grid-cols-2 gap-x-3 text-xs text-ink-300">
               <div>
-                <span className="text-ink-500">Quirk:</span> {n.quirk}
+                <span className="text-ink-500">Quirk: </span>
+                {n.quirk}
               </div>
               <div>
-                <span className="text-ink-500">Hook:</span> {n.hook}
+                <span className="text-ink-500">Hook: </span>
+                {n.hook}
               </div>
             </div>
             <div className="flex flex-wrap gap-1">
@@ -296,7 +370,9 @@ function GeneratorTab({ campaignId }: { campaignId: string }) {
           </li>
         ))}
         {results.length === 0 && (
-          <li className="py-4 text-center text-ink-400">No NPCs yet — roll some up.</li>
+          <li className="flex h-full items-center justify-center py-8 text-center text-ink-500">
+            Choose a culture and roll some NPCs.
+          </li>
         )}
       </ul>
     </div>
@@ -306,7 +382,7 @@ function GeneratorTab({ campaignId }: { campaignId: string }) {
 registerWidget({
   type: "npc",
   title: "NPC Library",
-  defaultSize: { w: 460, h: 440 },
+  defaultSize: { w: 480, h: 460 },
   Component: NpcLibraryWidget,
 });
 
