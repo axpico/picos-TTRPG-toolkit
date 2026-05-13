@@ -17,3 +17,4 @@ export * from "./sse.js";
 export * from "./dice.js";
 export * from "./location.js";
 export * from "./sticky.js";
+export * from "./clock.js";
