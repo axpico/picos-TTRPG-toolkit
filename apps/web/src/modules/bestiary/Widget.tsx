@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Monster } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
+import { InlineConfirm } from "../shared.js";
 import {
   useCreateMonster,
   useDeleteMonster,
@@ -78,9 +79,7 @@ function BestiaryWidget({ campaignId }: WidgetContext) {
             key={m.id}
             monster={m}
             onChange={(input) => update.mutate({ id: m.id, input })}
-            onDelete={() => {
-              if (confirm(`Delete "${m.name}" from the bestiary?`)) remove.mutate(m.id);
-            }}
+            onDelete={() => remove.mutate(m.id)}
           />
         ))}
         {list.data?.length === 0 && (
@@ -99,6 +98,11 @@ interface RowProps {
 
 function MonsterRow({ monster, onChange, onDelete }: RowProps) {
   const [open, setOpen] = useState(false);
+  const [localName, setLocalName] = useState(monster.name);
+  const [localType, setLocalType] = useState(monster.type ?? "");
+  const [localChallenge, setLocalChallenge] = useState(monster.challenge ?? "");
+  const [localEnvironment, setLocalEnvironment] = useState(monster.environment ?? "");
+  const [localTags, setLocalTags] = useState(monster.tags.join(", "));
   const [statsText, setStatsText] = useState(() => JSON.stringify(monster.stats, null, 2));
   const [statsErr, setStatsErr] = useState<string | null>(null);
 
@@ -127,38 +131,50 @@ function MonsterRow({ monster, onChange, onDelete }: RowProps) {
         </button>
         <input
           className="input flex-1"
-          value={monster.name}
-          onChange={(e) => onChange({ name: e.target.value })}
+          value={localName}
+          onChange={(e) => setLocalName(e.target.value)}
+          onBlur={() => localName !== monster.name && onChange({ name: localName })}
         />
         <input
           className="input w-28"
           placeholder="Type"
-          value={monster.type ?? ""}
-          onChange={(e) => onChange({ type: e.target.value || undefined })}
+          value={localType}
+          onChange={(e) => setLocalType(e.target.value)}
+          onBlur={() =>
+            (localType || undefined) !== (monster.type ?? undefined) &&
+            onChange({ type: localType || undefined })
+          }
         />
         <input
           className="input w-20 text-right"
           placeholder="CR"
-          value={monster.challenge ?? ""}
-          onChange={(e) => onChange({ challenge: e.target.value || undefined })}
+          value={localChallenge}
+          onChange={(e) => setLocalChallenge(e.target.value)}
+          onBlur={() =>
+            (localChallenge || undefined) !== (monster.challenge ?? undefined) &&
+            onChange({ challenge: localChallenge || undefined })
+          }
         />
-        <button className="btn-ghost px-2" onClick={onDelete} title="Delete">
-          ×
-        </button>
+        <InlineConfirm onConfirm={onDelete} title="Delete creature" />
       </div>
       {open && (
         <div className="space-y-1.5 border-t border-ink-700 px-2 py-2 text-xs">
           <input
             className="input"
             placeholder="Environment"
-            value={monster.environment ?? ""}
-            onChange={(e) => onChange({ environment: e.target.value || undefined })}
+            value={localEnvironment}
+            onChange={(e) => setLocalEnvironment(e.target.value)}
+            onBlur={() =>
+              (localEnvironment || undefined) !== (monster.environment ?? undefined) &&
+              onChange({ environment: localEnvironment || undefined })
+            }
           />
           <input
             className="input"
             placeholder="Tags (comma-separated)"
-            value={monster.tags.join(", ")}
-            onChange={(e) =>
+            value={localTags}
+            onChange={(e) => setLocalTags(e.target.value)}
+            onBlur={(e) =>
               onChange({
                 tags: e.target.value
                   .split(",")
@@ -178,8 +194,8 @@ function MonsterRow({ monster, onChange, onDelete }: RowProps) {
           <textarea
             className="input min-h-[60px]"
             placeholder="GM notes"
-            value={monster.notes ?? ""}
-            onChange={(e) => onChange({ notes: e.target.value || undefined })}
+            defaultValue={monster.notes ?? ""}
+            onBlur={(e) => onChange({ notes: e.target.value || undefined })}
           />
         </div>
       )}

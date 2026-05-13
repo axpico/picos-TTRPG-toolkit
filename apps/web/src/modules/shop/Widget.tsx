@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { GenerateShopInput, Shop, ShopItem } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
+import { InlineConfirm } from "../shared.js";
 import {
   useCreateShop,
   useCreateShopItem,
@@ -55,13 +56,10 @@ function ShopWidget({ campaignId, state, setState }: WidgetContext) {
 
       {selected ? (
         <ShopEditor
+          key={selected.id}
           shop={selected}
           campaignId={campaignId}
-          onDelete={() => {
-            if (confirm(`Delete shop "${selected.name}"?`)) {
-              remove.mutate(selected.id, { onSuccess: () => select(null) });
-            }
-          }}
+          onDelete={() => remove.mutate(selected.id, { onSuccess: () => select(null) })}
         />
       ) : (
         <Generator
@@ -97,9 +95,7 @@ function ShopEditor({ shop, campaignId, onDelete }: EditorProps) {
             updateShop.mutate({ id: shop.id, input: { name: e.target.value } })
           }
         />
-        <button className="btn-danger px-2" onClick={onDelete}>
-          Delete
-        </button>
+        <InlineConfirm onConfirm={onDelete} title="Delete shop" />
       </header>
       <textarea
         className="input mx-2 mt-2 min-h-[40px] text-xs"

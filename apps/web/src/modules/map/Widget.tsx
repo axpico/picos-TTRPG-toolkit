@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import type { Location, MapPin, MapReveal } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
+import { InlineConfirm } from "../shared.js";
 import { useBroadcasts, useSetBroadcast } from "../broadcast/api.js";
 import {
   useCreateLocation,
@@ -131,10 +132,8 @@ function MapWidget({ campaignId, state, setState }: WidgetContext) {
               })
             }
             onDelete={() => {
-              if (confirm(`Delete location "${selected.name}"?`)) {
-                remove.mutate(selected.id);
-                setState({ selectedId: null });
-              }
+              remove.mutate(selected.id);
+              setState({ selectedId: null });
             }}
           />
         ) : (
@@ -240,9 +239,7 @@ function MapEditor({ location, tool, setTool, onChange, onUpload, onDelete }: Ed
         >
           Reveal
         </button>
-        <button className="btn-ghost text-red-300" onClick={onDelete} title="Delete location">
-          ×
-        </button>
+        <InlineConfirm onConfirm={onDelete} title="Delete location" />
       </div>
 
       <div className="flex flex-1 overflow-hidden">

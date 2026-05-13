@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import type { ExternalLink, SessionEntry } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
+import { InlineConfirm } from "../shared.js";
 import {
   useCreateSession,
   useDeleteSession,
@@ -81,13 +82,9 @@ function SessionsWidget({ campaignId, state, setState }: WidgetContext) {
             key={detail.data.id}
             session={detail.data}
             onChange={(input) => update.mutate({ id: detail.data!.id, input })}
-            onDelete={() => {
-              if (confirm(`Delete session "${detail.data!.title}"?`)) {
-                remove.mutate(detail.data!.id, {
-                  onSuccess: () => selectSession(null),
-                });
-              }
-            }}
+            onDelete={() =>
+              remove.mutate(detail.data!.id, { onSuccess: () => selectSession(null) })
+            }
           />
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-ink-400">
@@ -140,9 +137,7 @@ function SessionEditor({ session, onChange, onDelete }: EditorProps) {
             onChange({ date: iso });
           }}
         />
-        <button className="btn-danger px-2" onClick={onDelete}>
-          Delete
-        </button>
+        <InlineConfirm onConfirm={onDelete} title="Delete session" />
       </header>
 
       <div className="grid grid-cols-1 gap-2 overflow-auto p-3">
