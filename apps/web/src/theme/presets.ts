@@ -187,6 +187,92 @@ export const PRESETS: ThemePreset[] = [
     },
     fonts: { display: FONT.fraunces, body: FONT.plex, mono: FONT.jetbrains },
   },
+
+  // ── Fantasy moods ──────────────────────────────────────────────────────────
+  {
+    id: "sylvan",
+    label: "Sylvan Grove",
+    mode: "dark",
+    tokens: {
+      ink: [
+        "238 243 234", "221 231 214", "192 209 180", "155 179 137", "116 144 95",
+        "86 111 68", "63 83 49", "46 62 36", "31 43 24", "24 34 19", "17 24 13", "10 15 8",
+      ],
+      accent: ["154 208 90", "124 179 63", "94 142 44"],
+      accentFg: "10 15 8",
+    },
+    fonts: { display: FONT.cormorant, body: FONT.spectral, mono: FONT.jetbrains },
+  },
+  {
+    id: "dragonfire",
+    label: "Dragonfire",
+    mode: "dark",
+    tokens: {
+      ink: [
+        "246 236 230", "236 220 210", "215 188 171", "182 145 124", "143 107 87",
+        "109 79 64", "79 58 47", "58 43 35", "40 29 24", "31 22 18", "21 14 11", "12 7 6",
+      ],
+      accent: ["255 106 61", "237 79 34", "196 58 22"],
+      accentFg: "12 7 6",
+    },
+    fonts: { display: FONT.cinzel, body: FONT.spectral, mono: FONT.jetbrains },
+  },
+  {
+    id: "frostbound",
+    label: "Frostbound",
+    mode: "dark",
+    tokens: {
+      ink: [
+        "234 242 248", "214 230 240", "179 207 225", "136 173 200", "95 134 166",
+        "70 101 133", "52 76 102", "38 56 77", "26 39 56", "20 30 44", "13 20 31", "7 11 18",
+      ],
+      accent: ["95 208 230", "52 182 212", "32 144 176"],
+      accentFg: "7 11 18",
+    },
+    fonts: { display: FONT.cormorant, body: FONT.plex, mono: FONT.jetbrains },
+  },
+  {
+    id: "necropolis",
+    label: "Necropolis",
+    mode: "dark",
+    tokens: {
+      ink: [
+        "239 234 244", "221 212 232", "193 178 210", "156 135 179", "118 94 143",
+        "88 68 110", "65 50 81", "48 37 60", "33 25 41", "26 19 32", "17 12 22", "9 6 12",
+      ],
+      accent: ["110 231 168", "70 207 134", "47 163 103"],
+      accentFg: "9 6 12",
+    },
+    fonts: { display: FONT.cinzel, body: FONT.spectral, mono: FONT.jetbrains },
+  },
+  {
+    id: "bloodmoon",
+    label: "Bloodmoon",
+    mode: "dark",
+    tokens: {
+      ink: [
+        "244 233 233", "232 211 211", "208 175 175", "176 133 133", "138 95 95",
+        "105 71 71", "77 52 52", "57 39 39", "40 27 27", "31 21 21", "20 13 13", "10 6 6",
+      ],
+      accent: ["226 61 75", "198 36 51", "158 24 36"],
+      accentFg: "244 233 233",
+    },
+    fonts: { display: FONT.cinzel, body: FONT.spectral, mono: FONT.jetbrains },
+  },
+  {
+    id: "celestial",
+    label: "Celestial",
+    mode: "light",
+    tokens: {
+      ink: [
+        "42 39 64", "58 54 86", "81 76 115", "107 102 144", "138 134 168",
+        "168 164 192", "197 194 214", "218 215 230", "233 230 240", "241 238 246", "246 243 250", "250 248 255",
+      ],
+      accent: ["212 167 44", "189 144 21", "154 116 16"],
+      accentFg: "42 39 64",
+    },
+    fonts: { display: FONT.cormorant, body: FONT.spectral, mono: FONT.jetbrains },
+  },
 ];
 
 export const DEFAULT_PRESET_ID = "midnight";
