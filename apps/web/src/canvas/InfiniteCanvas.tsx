@@ -16,14 +16,36 @@ export function InfiniteCanvas({ campaignId }: Props) {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-ink-950">
+      {/* Themed dot grid. */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
           backgroundImage:
-            "radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)",
+            "radial-gradient(rgb(var(--ink-50) / 0.06) 1px, transparent 1px)",
           backgroundSize: "32px 32px",
         }}
       />
+      {/* Soft vignette for depth. */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(120% 90% at 50% 40%, transparent 55%, rgb(var(--ink-950) / 0.85))",
+        }}
+      />
+
+      {items.length === 0 && (
+        <div className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center">
+          <div className="rounded-xl border border-dashed border-ink-700 bg-ink-900/40 px-6 py-5 text-center text-ink-400 backdrop-blur-sm">
+            <p className="display text-lg text-ink-200">Your canvas is empty</p>
+            <p className="mt-1 text-sm">
+              Press <kbd className="rounded bg-ink-800 px-1.5 py-0.5 font-mono text-xs text-ink-200">/</kbd>
+              {" "}or <span className="text-ink-200">+ Add widget</span> to begin.
+            </p>
+          </div>
+        </div>
+      )}
+
       <TransformWrapper
         ref={ref}
         minScale={0.25}

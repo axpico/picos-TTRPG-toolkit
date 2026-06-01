@@ -86,8 +86,8 @@ export function PlayerView() {
   return (
     <div className="min-h-screen bg-ink-950 px-8 py-8 text-ink-50">
       <header className="mb-8 flex items-baseline justify-between">
-        <h1 className="text-2xl font-semibold">{s.campaign.name}</h1>
-        <span className="text-xs text-ink-500">Player view</span>
+        <h1 className="display text-3xl font-semibold tracking-tight">{s.campaign.name}</h1>
+        <span className="text-xs uppercase tracking-widest text-ink-500">Player view</span>
       </header>
 
       {!anyActive && (

@@ -31,4 +31,9 @@ describe("WidgetRegistry", () => {
     const sorted = [...titles].sort((a, b) => a.localeCompare(b));
     expect(titles).toEqual(sorted);
   });
+
+  it("an optional icon round-trips through getWidget", () => {
+    registerWidget({ type: "test-icon", title: "Iconic", defaultSize: { w: 1, h: 1 }, icon: "✦", Component: Noop });
+    expect(getWidget("test-icon")?.icon).toBe("✦");
+  });
 });

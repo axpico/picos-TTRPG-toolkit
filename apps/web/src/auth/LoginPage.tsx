@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLogin } from "./useAuth.js";
+import { ThemeControl } from "../theme/ThemePanel.js";
 
 export function LoginPage() {
   const [password, setPassword] = useState("");
@@ -15,12 +16,26 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-ink-950 px-4">
-      <form onSubmit={onSubmit} className="card w-full max-w-sm p-6">
-        <h1 className="mb-1 text-xl font-semibold text-ink-50">Pico's TTRPG Toolkit</h1>
-        <p className="mb-6 text-sm text-ink-300">Game Master sign-in</p>
+    <div className="relative flex min-h-screen items-center justify-center px-4">
+      <div className="absolute right-4 top-4">
+        <ThemeControl />
+      </div>
 
-        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink-300">
+      <form
+        onSubmit={onSubmit}
+        className="card w-full max-w-sm p-8 animate-[fadeIn_0.25s_ease-out]"
+      >
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-accent-500/40 bg-accent-500/10 text-accent-500">
+            <span className="display text-2xl">P</span>
+          </div>
+          <h1 className="display text-2xl font-semibold tracking-tight text-ink-50">
+            Pico's TTRPG Toolkit
+          </h1>
+          <p className="mt-1 text-sm text-ink-400">Game Master sign-in</p>
+        </div>
+
+        <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-ink-400">
           Password
         </label>
         <input
@@ -42,9 +57,9 @@ export function LoginPage() {
         <button
           type="submit"
           disabled={login.isPending || password.length === 0}
-          className="btn-primary mt-5 w-full"
+          className="btn-primary mt-6 w-full"
         >
-          {login.isPending ? "Signing in…" : "Sign in"}
+          {login.isPending ? "Signing in…" : "Enter"}
         </button>
       </form>
     </div>

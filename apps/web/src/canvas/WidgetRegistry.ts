@@ -20,6 +20,8 @@ export interface WidgetDefinition {
   defaultSize: { w: number; h: number };
   /** Optional fixed broadcast key (e.g. "party"). When omitted, the module is GM-only. */
   broadcastKey?: string;
+  /** Optional short glyph/emoji shown in the widget palette (falls back to a monogram). */
+  icon?: string;
   Component: ComponentType<WidgetContext>;
 }
 

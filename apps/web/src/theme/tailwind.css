@@ -3,23 +3,59 @@
 @tailwind utilities;
 
 @layer base {
+  /* Default theme (Midnight). JS overrides these as inline vars on <html> when
+     a different preset or a custom theme is selected; this block is the no-JS /
+     first-paint fallback and is kept in sync with presets.ts ("midnight"). */
+  :root {
+    --ink-50: 244 246 251;
+    --ink-100: 230 233 242;
+    --ink-200: 198 204 220;
+    --ink-300: 160 168 192;
+    --ink-400: 121 130 158;
+    --ink-500: 88 96 123;
+    --ink-600: 66 73 97;
+    --ink-700: 51 57 80;
+    --ink-800: 35 40 57;
+    --ink-850: 26 31 44;
+    --ink-900: 18 22 34;
+    --ink-950: 9 11 19;
+    --accent-500: 52 211 166;
+    --accent-600: 31 185 140;
+    --accent-700: 22 148 114;
+    --accent-fg: 8 12 16;
+    --font-display: "Cormorant Garamond", ui-serif, Georgia, serif;
+    --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+
   html, body, #root {
     height: 100%;
   }
   body {
-    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-body);
+    color: rgb(var(--ink-50));
+    background-color: rgb(var(--ink-950));
+    /* Subtle atmosphere: a soft accent-tinted glow up top, fading into the base.
+       Reads as depth across both light and dark ramps. */
+    background-image:
+      radial-gradient(120% 80% at 50% -10%, rgb(var(--accent-500) / 0.08), transparent 60%),
+      radial-gradient(100% 60% at 100% 0%, rgb(var(--ink-800) / 0.6), transparent 55%);
+    background-attachment: fixed;
     -webkit-font-smoothing: antialiased;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 }
 
 @layer components {
   .btn {
     @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm
-           font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500
-           disabled:opacity-50 disabled:pointer-events-none;
+           font-medium transition-all duration-150 focus:outline-none focus-visible:ring-2
+           focus-visible:ring-accent-500 focus-visible:ring-offset-1 focus-visible:ring-offset-ink-950
+           disabled:opacity-50 disabled:pointer-events-none active:translate-y-px;
   }
   .btn-primary {
-    @apply btn bg-accent-600 text-white hover:bg-accent-500;
+    @apply btn bg-accent-600 hover:bg-accent-500 shadow-sm;
+    color: rgb(var(--accent-fg));
   }
   .btn-ghost {
     @apply btn text-ink-200 hover:bg-ink-800 hover:text-ink-50;
@@ -28,14 +64,30 @@
     @apply btn bg-red-700 text-white hover:bg-red-600;
   }
   .input {
-    @apply w-full rounded-md border border-ink-700 bg-ink-900 px-2 py-1 text-sm text-ink-50
-           placeholder-ink-500 focus:border-accent-500 focus:outline-none focus:ring-1
-           focus:ring-accent-500;
+    @apply w-full rounded-md border border-ink-700 bg-ink-900 px-2.5 py-1.5 text-sm text-ink-50
+           placeholder-ink-500 transition-colors focus:border-accent-500 focus:outline-none
+           focus:ring-1 focus:ring-accent-500;
   }
   .card {
-    @apply rounded-lg border border-ink-700 bg-ink-850 shadow-lg;
+    @apply rounded-xl border border-ink-700/80 bg-ink-850/90 shadow-lg backdrop-blur-sm;
   }
   .chip {
-    @apply inline-flex items-center gap-1 rounded-full bg-ink-800 px-2 py-0.5 text-xs text-ink-200;
+    @apply inline-flex items-center gap-1 rounded-full border border-ink-700/60 bg-ink-800 px-2 py-0.5
+           text-xs text-ink-200;
   }
+  /* Display type for wordmarks and section headings. */
+  .display {
+    font-family: var(--font-display);
+    letter-spacing: 0.01em;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }

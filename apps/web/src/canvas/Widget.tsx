@@ -79,9 +79,9 @@ export function Widget({ campaignId, item }: Props) {
     >
       <div className="card flex h-full flex-col overflow-hidden">
         <header
-          className={`${DRAG_HANDLE} flex cursor-grab select-none items-center justify-between border-b border-ink-700 bg-ink-800/60 px-3 py-1.5 text-sm font-medium`}
+          className={`${DRAG_HANDLE} flex cursor-grab select-none items-center justify-between border-b border-ink-700/80 bg-ink-800/70 px-3 py-1.5 text-sm font-medium`}
         >
-          <span className="text-ink-50">{def.title}</span>
+          <span className="display tracking-wide text-ink-50">{def.title}</span>
           <div className="flex items-center gap-1">
             {def.broadcastKey !== undefined && (
               <BroadcastToggle campaignId={campaignId} widgetKey={broadcastKey} />

@@ -1,33 +1,25 @@
 /** @type {import('tailwindcss').Config} */
+
+// Build a Tailwind color scale whose every stop resolves from a CSS variable
+// holding an "R G B" channel triple, so themes can be swapped at runtime while
+// `<alpha-value>` opacity utilities keep working.
+const scale = (name, stops) =>
+  Object.fromEntries(stops.map((s) => [s, `rgb(var(--${name}-${s}) / <alpha-value>)`]));
+
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   darkMode: "class",
   theme: {
     extend: {
       colors: {
-        ink: {
-          50: "#f5f6fa",
-          100: "#e8eaf1",
-          200: "#c8cddb",
-          300: "#a3aac0",
-          400: "#7c849f",
-          500: "#5a627d",
-          600: "#454c63",
-          700: "#363b4d",
-          800: "#252a39",
-          850: "#1c2230",
-          900: "#141826",
-          950: "#0b0e18",
-        },
-        accent: {
-          500: "#7c6cff",
-          600: "#6b59f0",
-          700: "#5a48d6",
-        },
+        ink: scale("ink", [50, 100, 200, 300, 400, 500, 600, 700, 800, 850, 900, 950]),
+        accent: scale("accent", [500, 600, 700]),
+        "accent-fg": "rgb(var(--accent-fg) / <alpha-value>)",
       },
       fontFamily: {
-        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "ui-monospace", "monospace"],
+        display: ["var(--font-display)"],
+        sans: ["var(--font-body)"],
+        mono: ["var(--font-mono)"],
       },
     },
   },

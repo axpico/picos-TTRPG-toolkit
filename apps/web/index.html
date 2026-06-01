@@ -4,8 +4,23 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="dark light" />
     <title>Pico's TTRPG Toolkit</title>
+    <script>
+      // Pre-paint: apply the saved theme's resolved CSS variables before React
+      // mounts, to avoid a flash of the default theme on reload.
+      (function () {
+        try {
+          var raw = localStorage.getItem("ttrpg-theme-vars");
+          if (!raw) return;
+          var vars = JSON.parse(raw);
+          var root = document.documentElement;
+          for (var k in vars) {
+            if (Object.prototype.hasOwnProperty.call(vars, k)) root.style.setProperty(k, vars[k]);
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body class="bg-ink-950 text-ink-50">
     <div id="root"></div>
