@@ -273,6 +273,91 @@ export const PRESETS: ThemePreset[] = [
     },
     fonts: { display: FONT.cormorant, body: FONT.spectral, mono: FONT.jetbrains },
   },
+
+  {
+    id: "embercourt",
+    label: "Ember Court",
+    mode: "dark",
+    tokens: {
+      ink: [
+        "244 237 229", "232 221 212", "214 197 184", "183 160 143", "148 122 105",
+        "114 88 72", "84 63 50", "63 47 39", "44 33 27", "33 24 20", "23 16 14", "12 8 7",
+      ],
+      accent: ["255 119 72", "232 92 43", "186 63 24"],
+      accentFg: "12 8 7",
+    },
+    fonts: { display: FONT.cinzel, body: FONT.spectral, mono: FONT.jetbrains },
+  },
+  {
+    id: "velvetcrypt",
+    label: "Velvet Crypt",
+    mode: "dark",
+    tokens: {
+      ink: [
+        "245 237 248", "229 214 236", "205 181 217", "173 137 190", "140 99 160",
+        "108 72 127", "81 54 98", "61 42 77", "42 29 55", "32 22 42", "22 15 29", "12 8 18",
+      ],
+      accent: ["232 108 255", "194 74 224", "145 44 172"],
+      accentFg: "12 8 18",
+    },
+    fonts: { display: FONT.fraunces, body: FONT.spectral, mono: FONT.jetbrains },
+  },
+  {
+    id: "aurora",
+    label: "Aurora",
+    mode: "light",
+    tokens: {
+      ink: [
+        "58 45 74", "74 60 94", "92 77 116", "112 96 137", "133 117 157",
+        "156 140 177", "180 166 196", "202 191 214", "220 213 227", "232 228 238", "242 240 246", "249 248 252",
+      ],
+      accent: ["77 185 168", "50 158 143", "31 122 111"],
+      accentFg: "249 248 252",
+    },
+    fonts: { display: FONT.fraunces, body: FONT.plex, mono: FONT.jetbrains },
+  },
+  {
+    id: "seaborne",
+    label: "Seaborne",
+    mode: "light",
+    tokens: {
+      ink: [
+        "40 57 77", "56 76 97", "74 95 119", "93 116 139", "115 138 161",
+        "137 160 183", "160 182 203", "185 202 219", "207 220 231", "223 234 241", "236 244 247", "247 251 252",
+      ],
+      accent: ["41 132 207", "28 107 178", "18 83 147"],
+      accentFg: "247 251 252",
+    },
+    fonts: { display: FONT.cormorant, body: FONT.plex, mono: FONT.jetbrains },
+  },
+  {
+    id: "rosequartz",
+    label: "Rose Quartz",
+    mode: "light",
+    tokens: {
+      ink: [
+        "73 48 60", "90 64 76", "109 82 94", "131 103 112", "151 125 132",
+        "172 149 155", "192 172 175", "211 193 194", "226 211 212", "236 224 224", "244 236 236", "249 247 247",
+      ],
+      accent: ["198 89 119", "171 63 93", "138 43 72"],
+      accentFg: "249 247 247",
+    },
+    fonts: { display: FONT.cinzel, body: FONT.spectral, mono: FONT.jetbrains },
+  },
+  {
+    id: "sunlit",
+    label: "Sunlit Archive",
+    mode: "light",
+    tokens: {
+      ink: [
+        "70 54 27", "89 70 37", "111 90 51", "134 112 67", "159 136 88",
+        "183 160 112", "206 183 138", "223 203 163", "236 220 191", "244 232 210", "249 240 226", "252 246 238",
+      ],
+      accent: ["214 146 36", "180 117 23", "141 89 14"],
+      accentFg: "252 246 238",
+    },
+    fonts: { display: FONT.cormorant, body: FONT.spectral, mono: FONT.jetbrains },
+  },
 ];
 
 export const DEFAULT_PRESET_ID = "midnight";
