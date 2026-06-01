@@ -71,12 +71,14 @@ function priceJitter(rng: () => number, base: number) {
   return Math.round(v * 100) / 100;
 }
 
-export function generateShop(input: GenerateShopInput): {
+export function generateShop(
+  input: GenerateShopInput,
+  rng: () => number = Math.random,
+): {
   name: string;
   notes: string;
   items: CreateShopItemInput[];
 } {
-  const rng = Math.random;
   const flavor = input.flavor ?? "general";
   const sizeKey = input.size ?? "medium";
   const cap = input.rarityCap ?? "rare";

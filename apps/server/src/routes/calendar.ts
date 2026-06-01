@@ -4,10 +4,10 @@ import {
   advanceCalendarInput,
   DEFAULT_CALENDAR_DEFINITION,
   setCalendarInput,
-  type CalendarDefinition,
 } from "@toolkit/shared";
 import { prisma } from "../db.js";
 import { toCalendarDto } from "../lib/repos/calendar.js";
+import { advance, advanceToMinutes, clampDay } from "../lib/calendar.js";
 import { writeLog } from "../services/log.js";
 
 const cidParams = z.object({ id: z.string().min(1) });
@@ -21,45 +21,6 @@ async function ensureCalendar(campaignId: string) {
     },
     update: {},
   });
-}
-
-function clampDay(def: CalendarDefinition, month: number, day: number) {
-  const idx = Math.max(1, Math.min(def.monthNames.length, month)) - 1;
-  const max = def.daysPerMonth[idx] ?? 30;
-  return Math.max(1, Math.min(max, day));
-}
-
-function advance(
-  def: CalendarDefinition,
-  state: { y: number; mo: number; d: number; h: number; mi: number },
-  totalMinutes: number,
-) {
-  let { y, mo, d, h, mi } = state;
-  mi += totalMinutes;
-  const minutesPerDay = def.hoursPerDay * def.minutesPerHour;
-  while (mi >= def.minutesPerHour) {
-    mi -= def.minutesPerHour;
-    h += 1;
-  }
-  while (h >= def.hoursPerDay) {
-    h -= def.hoursPerDay;
-    d += 1;
-  }
-  // Negative case: not used because totalMinutes always >= 0 here.
-  let safety = 10_000;
-  while (safety-- > 0) {
-    const monthIdx = ((mo - 1) % def.monthNames.length + def.monthNames.length) % def.monthNames.length;
-    const dim = def.daysPerMonth[monthIdx] ?? 30;
-    if (d <= dim) break;
-    d -= dim;
-    mo += 1;
-    if (mo > def.monthNames.length) {
-      mo = 1;
-      y += 1;
-    }
-  }
-  void minutesPerDay; // referenced for invariants; calculation uses h/mi rollovers above
-  return { y, mo, d, h, mi };
 }
 
 export const calendarRoutes: FastifyPluginAsync = async (app) => {
@@ -105,12 +66,7 @@ export const calendarRoutes: FastifyPluginAsync = async (app) => {
     const body = advanceCalendarInput.parse(req.body ?? {});
     const existing = await ensureCalendar(id);
     const dto = toCalendarDto(existing);
-    const spr = body.secondsPerRound ?? 6;
-    const totalMinutes =
-      Math.floor(((body.rounds ?? 0) * spr) / 60) +
-      (body.minutes ?? 0) +
-      (body.hours ?? 0) * dto.definition.minutesPerHour +
-      (body.days ?? 0) * dto.definition.hoursPerDay * dto.definition.minutesPerHour;
+    const totalMinutes = advanceToMinutes(dto.definition, body);
     const next = advance(
       dto.definition,
       { y: dto.currentYear, mo: dto.currentMonth, d: dto.currentDay, h: dto.currentHour, mi: dto.currentMinute },

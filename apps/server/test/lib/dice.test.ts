@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { rollNotation } from "./dice.js";
+import { rollNotation } from "../../src/lib/dice.js";
 
 test("a constant evaluates to itself", () => {
   const r = rollNotation("5");

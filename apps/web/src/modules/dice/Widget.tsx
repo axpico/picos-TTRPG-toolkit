@@ -2,35 +2,9 @@ import { useRef, useState } from "react";
 import clsx from "clsx";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { useDiceHistory, useRollDice } from "./api.js";
+import { fmtTime, parseBreakdown } from "./format.js";
 
 const QUICK_DICE = ["d4", "d6", "d8", "d10", "d12", "d20", "d100"] as const;
-
-type BreakdownTerm =
-  | { kind: "roll"; count: number; sides: number; rolls: number[] }
-  | { kind: "const"; value: number };
-
-function parseBreakdown(json: string): string {
-  try {
-    const terms = JSON.parse(json) as BreakdownTerm[];
-    const parts: string[] = [];
-    for (const t of terms) {
-      if (t.kind === "roll") {
-        const rollStr = t.rolls.join("+");
-        const sum = t.rolls.reduce((a, b) => a + b, 0);
-        parts.push(`${t.count}d${t.sides} [${rollStr}=${sum}]`);
-      } else if (t.kind === "const") {
-        parts.push(t.value >= 0 ? `+${t.value}` : `${t.value}`);
-      }
-    }
-    return parts.join(" ").replace(/^\+/, "");
-  } catch {
-    return json;
-  }
-}
-
-function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
 
 function DiceWidget({ campaignId }: WidgetContext) {
   const [notation, setNotation] = useState("1d20");

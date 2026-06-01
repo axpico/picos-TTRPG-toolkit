@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pickWeighted } from "./table.js";
+import { pickWeighted } from "../../src/lib/table.js";
 
 test("single entry is always picked", () => {
   const entries = [{ weight: 1, text: "only" }];
