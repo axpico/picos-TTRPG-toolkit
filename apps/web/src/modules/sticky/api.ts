@@ -27,16 +27,14 @@ export function useCreateStickyNote(campaignId: string) {
 }
 
 export function useUpdateStickyNote(campaignId: string) {
-  const qc = useQueryClient();
+  // Intentionally no cache invalidation on update: drag, resize, and text edits
+  // fire frequently. The next refetch (or SSE event) reconciles.
   return useMutation({
     mutationFn: (args: { id: string; input: UpdateStickyNoteInput }) =>
       api.patch<StickyNote>(
         `/api/campaigns/${campaignId}/sticky-notes/${args.id}`,
         args.input,
       ),
-    // Don't invalidate on every drag/keystroke; we mutate locally in the
-    // component and write through. The next `useStickyNotes` refetch (or SSE
-    // event) will reconcile.
   });
 }
 
