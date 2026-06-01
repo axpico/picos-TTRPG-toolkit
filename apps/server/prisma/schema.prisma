@@ -41,6 +41,7 @@ model Campaign {
   diceRolls    DiceRoll[]
   broadcasts   Broadcast[]
   clocks       ProgressClock[]
+  rollTables   RollTable[]
 }
 
 model Layout {
@@ -265,6 +266,21 @@ model ProgressClock {
   filled      Int      @default(0)
   description String?
   color       String   @default("#6366f1")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([campaignId, order])
+}
+
+model RollTable {
+  id          String   @id @default(cuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  // [{ weight: Int, text: String }]
+  entriesJson String   @default("[]")
   order       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

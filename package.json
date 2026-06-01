@@ -16,7 +16,8 @@
     "serve": "npm run start -w apps/server",
     "migrate": "npm run migrate -w apps/server",
     "seed": "npm run seed -w apps/server",
-    "check": "npm run check --workspaces --if-present"
+    "check": "npm run check --workspaces --if-present",
+    "test": "npm run test -w apps/server"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",

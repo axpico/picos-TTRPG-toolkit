@@ -8,7 +8,7 @@ import { toCalendarDto } from "../lib/repos/calendar.js";
 import { toBroadcastDto } from "../lib/repos/broadcast.js";
 import { toPublicLocation } from "../lib/repos/location.js";
 import { openSse } from "../plugins/sse.js";
-import type { SSEEvent } from "@toolkit/shared";
+import { rollTableResult, type RollTableResult, type SSEEvent } from "@toolkit/shared";
 
 const params = z.object({ campaignId: z.string().min(1) });
 const query = z.object({ t: z.string().min(1) });
@@ -48,6 +48,19 @@ export const playerRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
+    // The latest random-table result lives entirely in the broadcast payload —
+    // no DB resource needed (same trick as map:current's locationId).
+    const tableBroadcast = broadcasts.find((b) => b.widgetKey === "rolltable:current");
+    let tableResult: RollTableResult | null = null;
+    if (tableBroadcast) {
+      try {
+        const parsed = rollTableResult.safeParse(JSON.parse(tableBroadcast.payloadJson));
+        if (parsed.success) tableResult = parsed.data;
+      } catch {
+        /* malformed payload, ignore */
+      }
+    }
+
     const [party, activeEncounter, weatherRow, calendarRow, mapRow] = await Promise.all([
       prisma.partyMember.findMany({
         where: { campaignId },
@@ -80,6 +93,7 @@ export const playerRoutes: FastifyPluginAsync = async (app) => {
           active.has("map:current") && mapRow && mapRow.campaignId === campaignId
             ? toPublicLocation(mapRow)
             : null,
+        rolltable: active.has("rolltable:current") ? tableResult : null,
       },
     };
   });

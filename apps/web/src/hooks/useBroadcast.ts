@@ -50,6 +50,9 @@ export function useBroadcast({ url, campaignId, onEvent }: Options) {
       if (event.type.startsWith("sticky.")) {
         qc.invalidateQueries({ queryKey: ["sticky", campaignId] });
       }
+      if (event.type.startsWith("rolltable.")) {
+        qc.invalidateQueries({ queryKey: ["player", campaignId] });
+      }
       if (event.type === "broadcast.change") {
         qc.invalidateQueries({ queryKey: ["broadcasts", campaignId] });
         qc.invalidateQueries({ queryKey: ["player", campaignId] });
@@ -94,6 +97,7 @@ export function useBroadcast({ url, campaignId, onEvent }: Options) {
       "location.update",
       "sticky.update",
       "sticky.delete",
+      "rolltable.roll",
     ];
     for (const t of eventTypes) source.addEventListener(t, onCustom as EventListener);
 

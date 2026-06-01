@@ -7,6 +7,7 @@ import type {
   PartyMember,
   PartyMemberStatus,
   PublicLocation,
+  RollTableResult,
   Weather,
 } from "@toolkit/shared";
 import { api } from "../api/client.js";
@@ -22,6 +23,7 @@ interface PlayerState {
     weather: Weather | null;
     calendar: Calendar | null;
     map: PublicLocation | null;
+    rolltable: RollTableResult | null;
   };
 }
 
@@ -109,6 +111,15 @@ export function PlayerView() {
             {String(s.data.calendar.currentHour).padStart(2, "0")}:
             {String(s.data.calendar.currentMinute).padStart(2, "0")}
           </div>
+        </section>
+      )}
+
+      {s.data.rolltable && (
+        <section className="card mb-4 border-accent-500/40 bg-accent-500/5 p-4">
+          <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-ink-300">
+            {s.data.rolltable.tableName}
+          </h2>
+          <div className="text-lg font-semibold text-accent-400">{s.data.rolltable.text}</div>
         </section>
       )}
 

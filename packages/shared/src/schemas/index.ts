@@ -18,3 +18,4 @@ export * from "./dice.js";
 export * from "./location.js";
 export * from "./sticky.js";
 export * from "./clock.js";
+export * from "./rolltable.js";

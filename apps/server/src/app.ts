@@ -24,6 +24,7 @@ import { adminRoutes } from "./routes/admin.js";
 import { locationRoutes } from "./routes/location.js";
 import { stickyRoutes } from "./routes/sticky.js";
 import { clockRoutes } from "./routes/clock.js";
+import { rollTableRoutes } from "./routes/rolltable.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -69,6 +70,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     await gm.register(locationRoutes, { prefix: "/api/campaigns" });
     await gm.register(stickyRoutes, { prefix: "/api/campaigns" });
     await gm.register(clockRoutes, { prefix: "/api/campaigns" });
+    await gm.register(rollTableRoutes, { prefix: "/api/campaigns" });
     await gm.register(streamRoutes, { prefix: "/api/stream" });
     await gm.register(fileUploadRoutes, { prefix: "/api/uploads" });
     await gm.register(adminRoutes, { prefix: "/api/admin" });

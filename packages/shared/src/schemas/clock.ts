@@ -21,7 +21,9 @@ export const createClockInput = z.object({
   description: z.string().max(500).optional(),
   color: z.string().max(20).optional(),
 });
-export type CreateClockInput = z.infer<typeof createClockInput>;
+// Use the input type so zod-defaulted fields (segments, filled) stay optional
+// for callers — the schema fills them in at parse time on the server.
+export type CreateClockInput = z.input<typeof createClockInput>;
 
 export const updateClockInput = z.object({
   name: z.string().min(1).max(120).optional(),
