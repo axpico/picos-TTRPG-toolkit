@@ -50,6 +50,12 @@ apps/web      React SPA (GM canvas + player view)
 packages/shared  zod schemas + shared TS types
 ```
 
+## Theming
+The GM app ships several built-in themes (dark + light), a custom-theme editor
+(**◐ Theme** in the header), and a runtime CSS-variable system that recolors the
+whole app — widgets included. To add or customize themes, see
+[`apps/web/src/theme/README.md`](apps/web/src/theme/README.md).
+
 ## Backup / restore
 Hit `GET /api/admin/export` while logged in. The server uses `VACUUM INTO` to take a hot copy of the SQLite DB and streams it back with the `uploads/` folder zipped alongside.
 
