@@ -33,13 +33,28 @@ function Swatches({ presetId, custom }: { presetId: string; custom: Record<strin
 
 export function ThemeControl() {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const { presetId, custom, presets, setPreset, setCustomVar, clearCustom } = useTheme();
 
   const resolved = presetToVars(getPreset(presetId), custom ?? undefined);
+  const query = search.trim().toLowerCase();
+  const filteredPresets = query
+    ? presets.filter((p) => {
+        const haystack = `${p.label} ${p.mode}`.toLowerCase();
+        return haystack.includes(query);
+      })
+    : presets;
 
   return (
     <>
-      <button className="btn-ghost" onClick={() => setOpen(true)} title="Change theme">
+      <button
+        className="btn-ghost"
+        onClick={() => {
+          setSearch("");
+          setOpen(true);
+        }}
+        title="Change theme"
+      >
         ◐ Theme
       </button>
       <Modal open={open} onClose={() => setOpen(false)} className="max-w-lg" labelledBy="theme-title">
@@ -50,9 +65,21 @@ export function ThemeControl() {
 
         <div className="space-y-5 p-5">
           <section>
-            <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-400">Presets</h3>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">Presets</h3>
+              <label className="flex w-full max-w-52 items-center gap-2 rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-xs text-ink-400 focus-within:border-accent-500">
+                <span>Search</span>
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Label, mode"
+                  className="w-full bg-transparent text-sm text-ink-50 placeholder:text-ink-500 focus:outline-none"
+                />
+              </label>
+            </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {presets.map((p) => (
+              {filteredPresets.map((p) => (
                 <button
                   key={p.id}
                   onClick={() => setPreset(p.id)}
@@ -73,6 +100,9 @@ export function ThemeControl() {
                 </button>
               ))}
             </div>
+            {filteredPresets.length === 0 && (
+              <p className="mt-2 text-sm text-ink-500">No themes match that search.</p>
+            )}
           </section>
 
           <section>
