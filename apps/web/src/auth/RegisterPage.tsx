@@ -1,18 +1,23 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useLogin } from "./useAuth.js";
+import { useRegister } from "./useAuth.js";
 import { ThemeControl } from "../theme/ThemePanel.js";
 
-export function LoginPage() {
+export function RegisterPage() {
   const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
-  const login = useLogin();
+  const register = useRegister();
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
-    login.mutate(
-      { username: username.trim(), password },
+    register.mutate(
+      {
+        username: username.trim(),
+        password,
+        displayName: displayName.trim() || undefined,
+      },
       { onSuccess: () => navigate("/campaigns", { replace: true }) },
     );
   };
@@ -25,13 +30,8 @@ export function LoginPage() {
 
       <form onSubmit={onSubmit} className="card w-full max-w-sm p-8 animate-[fadeIn_0.25s_ease-out]">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-accent-500/40 bg-accent-500/10 text-accent-500">
-            <span className="display text-2xl">P</span>
-          </div>
-          <h1 className="display text-2xl font-semibold tracking-tight text-ink-50">
-            Pico's TTRPG Toolkit
-          </h1>
-          <p className="mt-1 text-sm text-ink-400">Sign in to your table</p>
+          <h1 className="display text-2xl font-semibold tracking-tight text-ink-50">Create account</h1>
+          <p className="mt-1 text-sm text-ink-400">Join or run a campaign</p>
         </div>
 
         <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-ink-400">
@@ -43,7 +43,18 @@ export function LoginPage() {
           onChange={(e) => setUsername(e.target.value)}
           autoFocus
           autoComplete="username"
+          placeholder="3+ chars, letters/numbers/_.-"
           required
+        />
+
+        <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-ink-400">
+          Display name <span className="text-ink-600">(optional)</span>
+        </label>
+        <input
+          className="input mb-3"
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          placeholder="Shown to your table"
         />
 
         <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-ink-400">
@@ -54,28 +65,29 @@ export function LoginPage() {
           className="input"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
+          autoComplete="new-password"
+          placeholder="At least 6 characters"
           required
         />
 
-        {login.isError && (
+        {register.isError && (
           <p className="mt-3 text-sm text-red-400">
-            {login.error instanceof Error ? login.error.message : "Sign-in failed."}
+            {register.error instanceof Error ? register.error.message : "Could not register."}
           </p>
         )}
 
         <button
           type="submit"
-          disabled={login.isPending || !username.trim() || password.length === 0}
+          disabled={register.isPending || username.trim().length < 3 || password.length < 6}
           className="btn-primary mt-6 w-full"
         >
-          {login.isPending ? "Signing in…" : "Enter"}
+          {register.isPending ? "Creating…" : "Create account"}
         </button>
 
         <p className="mt-4 text-center text-sm text-ink-400">
-          New here?{" "}
-          <Link to="/register" className="text-accent-500 hover:underline">
-            Create an account
+          Already have an account?{" "}
+          <Link to="/login" className="text-accent-500 hover:underline">
+            Sign in
           </Link>
         </p>
       </form>

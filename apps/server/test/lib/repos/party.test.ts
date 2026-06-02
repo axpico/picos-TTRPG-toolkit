@@ -6,6 +6,7 @@ import { toPartyDto } from "../../../src/lib/repos/party.js";
 const member = (over: Partial<DbPartyMember> = {}): DbPartyMember => ({
   id: "pm",
   campaignId: "camp",
+  userId: null,
   name: "Aria",
   playerName: "Sam",
   hp: 10,
@@ -37,4 +38,9 @@ test("nullable fields pass through", () => {
   const dto = toPartyDto(member({ playerName: null, notes: null }));
   assert.equal(dto.playerName, null);
   assert.equal(dto.notes, null);
+});
+
+test("userId (owning player) passes through", () => {
+  assert.equal(toPartyDto(member({ userId: "user-1" })).userId, "user-1");
+  assert.equal(toPartyDto(member({ userId: null })).userId, null);
 });

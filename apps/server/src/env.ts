@@ -9,6 +9,7 @@ const envSchema = z.object({
     .string()
     .min(1, "SESSION_KEY missing. Generate one with: node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\""),
   GM_PASSWORD: z.string().min(1).optional(),
+  GM_USERNAME: z.string().min(1).default("gm"),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -11,7 +11,7 @@ export function toCampaignDto(row: DbCampaign): CampaignDto {
     name: row.name,
     description: row.description,
     tags: parseJsonField(row.tagsJson, tagsSchema, []),
-    shareToken: row.shareToken,
+    joinCode: row.joinCode,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

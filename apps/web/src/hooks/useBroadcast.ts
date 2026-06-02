@@ -47,11 +47,11 @@ export function useBroadcast({ url, campaignId, onEvent }: Options) {
         qc.invalidateQueries({ queryKey: ["locations", campaignId] });
         qc.invalidateQueries({ queryKey: ["player", campaignId] });
       }
-      if (event.type.startsWith("sticky.")) {
-        qc.invalidateQueries({ queryKey: ["sticky", campaignId] });
-      }
       if (event.type.startsWith("rolltable.")) {
         qc.invalidateQueries({ queryKey: ["player", campaignId] });
+      }
+      if (event.type.startsWith("dice.")) {
+        qc.invalidateQueries({ queryKey: ["dice", campaignId] });
       }
       if (event.type === "broadcast.change") {
         qc.invalidateQueries({ queryKey: ["broadcasts", campaignId] });
@@ -95,9 +95,8 @@ export function useBroadcast({ url, campaignId, onEvent }: Options) {
       "broadcast.change",
       "campaign.update",
       "location.update",
-      "sticky.update",
-      "sticky.delete",
       "rolltable.roll",
+      "dice.roll",
     ];
     for (const t of eventTypes) source.addEventListener(t, onCustom as EventListener);
 

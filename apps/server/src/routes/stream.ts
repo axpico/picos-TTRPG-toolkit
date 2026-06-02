@@ -5,7 +5,7 @@ import { openSse } from "../plugins/sse.js";
 const params = z.object({ campaignId: z.string().min(1) });
 
 export const streamRoutes: FastifyPluginAsync = async (app) => {
-  app.get("/:campaignId", async (req, reply) => {
+  app.get("/:campaignId", { preHandler: app.requireCampaignRole("dm") }, async (req, reply) => {
     const { campaignId } = params.parse(req.params);
     openSse(reply);
     const unsubscribe = app.bus.subscribe(campaignId, reply);

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { useCampaign, useRotateShareToken } from "./useCampaigns.js";
+import { useCampaign, useRotateJoinCode } from "./useCampaigns.js";
 import { useLogout } from "../auth/useAuth.js";
 import { useLayoutSync } from "../canvas/useLayout.js";
 import { InfiniteCanvas } from "../canvas/InfiniteCanvas.js";
@@ -8,7 +8,6 @@ import { listWidgets } from "../canvas/WidgetRegistry.js";
 import { WidgetPalette } from "../canvas/WidgetPalette.js";
 import { useCanvasStore } from "../canvas/store.js";
 import { useBroadcast } from "../hooks/useBroadcast.js";
-import { useCreateStickyNote } from "../modules/sticky/api.js";
 import { ThemeControl } from "../theme/ThemePanel.js";
 import { useConfirm } from "../components/ConfirmDialog.js";
 import { useToast } from "../components/Toast.js";
@@ -24,9 +23,8 @@ export function CampaignDashboard() {
   const logout = useLogout();
   const layoutSync = useLayoutSync(campaignId);
   const upsertItem = useCanvasStore((s) => s.upsertItem);
-  const createSticky = useCreateStickyNote(campaignId);
   const navigate = useNavigate();
-  const rotate = useRotateShareToken();
+  const rotate = useRotateJoinCode();
   const confirm = useConfirm();
   const toast = useToast();
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -55,7 +53,7 @@ export function CampaignDashboard() {
   }
 
   const c = campaign.data!;
-  const playerUrl = `${window.location.origin}/player/${c.id}?t=${c.shareToken}`;
+  const playerUrl = `${window.location.origin}/play/${c.id}`;
 
   const dropOrigin = () => {
     const viewport = useCanvasStore.getState().layout.viewport;
@@ -80,28 +78,24 @@ export function CampaignDashboard() {
     });
   };
 
-  const addSticky = () => {
-    const { x, y } = dropOrigin();
-    createSticky.mutate({ x, y });
-  };
-
-  const copyPlayerLink = async () => {
+  const copyJoinCode = async () => {
+    if (!c.joinCode) return;
     try {
-      await navigator.clipboard.writeText(playerUrl);
-      toast("Player link copied to clipboard.", "success");
+      await navigator.clipboard.writeText(c.joinCode);
+      toast("Join code copied — share it with your players.", "success");
     } catch {
-      window.open(playerUrl, "_blank", "noopener");
+      toast(`Join code: ${c.joinCode}`);
     }
   };
 
   const onRotate = async () => {
     const ok = await confirm({
-      title: "Rotate share token?",
-      message: "The current player link will stop working and a new one will be generated.",
+      title: "Rotate join code?",
+      message: "The current code stops working immediately; players who already joined keep access.",
       confirmLabel: "Rotate",
       danger: true,
     });
-    if (ok) rotate.mutate(c.id, { onSuccess: () => toast("Share token rotated.", "success") });
+    if (ok) rotate.mutate(c.id, { onSuccess: () => toast("Join code rotated.", "success") });
   };
 
   return (
@@ -112,25 +106,28 @@ export function CampaignDashboard() {
           <h1 className="display truncate text-base font-semibold">{c.name}</h1>
         </div>
         <div className="flex items-center gap-1.5">
-          <button className="btn-ghost" onClick={addSticky} title="Drop a sticky note on the canvas">
-            + Sticky
-          </button>
           <button className="btn-primary" onClick={() => setPaletteOpen(true)} title="Add widget (press / or ⌘K)">
             + Add widget
           </button>
           <div className="mx-1 h-5 w-px bg-ink-700" />
-          <button className="btn-ghost" onClick={copyPlayerLink} title="Copy the player view link">
-            Copy link
+          {c.joinCode && (
+            <button
+              className="btn-ghost font-mono"
+              onClick={copyJoinCode}
+              title="Copy the join code for players"
+            >
+              Code: {c.joinCode.slice(0, 8)}…
+            </button>
+          )}
+          <button className="btn-ghost" onClick={onRotate} title="Generate a new join code">
+            Rotate
           </button>
           <button
             className="btn-ghost"
-            title="Open player view in a new tab"
+            title="Open the player view in a new tab"
             onClick={() => window.open(playerUrl, "_blank", "noopener")}
           >
             Player view ↗
-          </button>
-          <button className="btn-ghost" onClick={onRotate} title="Generate a new share token">
-            Rotate token
           </button>
           <ThemeControl />
           <button

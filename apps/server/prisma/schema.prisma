@@ -11,10 +11,30 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Settings {
-  id           Int    @id @default(1)
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
   passwordHash String
-  theme        String @default("dark")
+  displayName  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships  Membership[]
+  characters   PartyMember[]
+  diceRolls    DiceRoll[]
+}
+
+model Membership {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  role       String   @default("player") // dm|player
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, campaignId])
+  @@index([campaignId])
 }
 
 model Campaign {
@@ -22,11 +42,12 @@ model Campaign {
   name        String
   description String?
   tagsJson    String   @default("[]")
-  shareToken  String   @unique
+  joinCode    String?  @unique
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   layout       Layout?
+  memberships  Membership[]
   sessions     Session[]
   party        PartyMember[]
   npcs         NPC[]
@@ -37,7 +58,6 @@ model Campaign {
   calendar     Calendar?
   weather      Weather?
   log          LogEntry[]
-  notes        StickyNote[]
   diceRolls    DiceRoll[]
   broadcasts   Broadcast[]
   clocks       ProgressClock[]
@@ -79,6 +99,8 @@ model PartyMember {
   id              String   @id @default(cuid())
   campaignId      String
   campaign        Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   name            String
   playerName      String?
   hp              Int      @default(0)
@@ -91,6 +113,7 @@ model PartyMember {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  @@unique([campaignId, userId])
   @@index([campaignId, order])
 }
 
@@ -243,20 +266,6 @@ model LogEntry {
   @@index([campaignId, createdAt])
 }
 
-model StickyNote {
-  id         String   @id @default(cuid())
-  campaignId String
-  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  text       String
-  color      String   @default("#fde68a")
-  x          Float    @default(0)
-  y          Float    @default(0)
-  width      Float    @default(220)
-  height     Float    @default(160)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-}
-
 model ProgressClock {
   id          String   @id @default(cuid())
   campaignId  String
@@ -292,6 +301,8 @@ model DiceRoll {
   id            String   @id @default(cuid())
   campaignId    String?
   campaign      Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   notation      String
   result        Int
   breakdownJson String

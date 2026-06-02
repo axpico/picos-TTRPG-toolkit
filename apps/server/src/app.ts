@@ -22,7 +22,6 @@ import { playerRoutes } from "./routes/player.js";
 import { fileReadRoutes, fileUploadRoutes } from "./routes/files.js";
 import { adminRoutes } from "./routes/admin.js";
 import { locationRoutes } from "./routes/location.js";
-import { stickyRoutes } from "./routes/sticky.js";
 import { clockRoutes } from "./routes/clock.js";
 import { rollTableRoutes } from "./routes/rolltable.js";
 
@@ -41,39 +40,47 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(sessionPlugin);
   await app.register(ssePlugin);
 
-  // Public auth endpoints.
+  // Public endpoints: auth (register/login/logout/me) + asset reads (UUID-addressed).
   await app.register(authRoutes, { prefix: "/api/auth" });
-
-  // Player-facing read-only endpoints (gated by share token, not session).
-  await app.register(playerRoutes, { prefix: "/api/player" });
-
-  // Asset retrieval is intentionally public — IDs are UUIDs and the player view
-  // needs to load maps/portraits without a session cookie.
   await app.register(fileReadRoutes, { prefix: "/api/files" });
 
-  // GM endpoints (everything else requires session).
-  await app.register(async (gm) => {
-    gm.addHook("preHandler", gm.requireGm);
-    await gm.register(campaignRoutes, { prefix: "/api/campaigns" });
-    await gm.register(layoutRoutes, { prefix: "/api/campaigns" });
-    await gm.register(broadcastRoutes, { prefix: "/api/campaigns" });
-    await gm.register(partyRoutes, { prefix: "/api/campaigns" });
-    await gm.register(combatRoutes, { prefix: "/api/campaigns" });
-    await gm.register(npcRoutes, { prefix: "/api/npcs" });
-    await gm.register(monsterRoutes, { prefix: "/api/monsters" });
-    await gm.register(sessionRoutes, { prefix: "/api/campaigns" });
-    await gm.register(shopRoutes, { prefix: "/api/campaigns" });
-    await gm.register(diceRoutes, { prefix: "/api/campaigns" });
-    await gm.register(weatherRoutes, { prefix: "/api/campaigns" });
-    await gm.register(calendarRoutes, { prefix: "/api/campaigns" });
-    await gm.register(logRoutes, { prefix: "/api/campaigns" });
-    await gm.register(locationRoutes, { prefix: "/api/campaigns" });
-    await gm.register(stickyRoutes, { prefix: "/api/campaigns" });
-    await gm.register(clockRoutes, { prefix: "/api/campaigns" });
-    await gm.register(rollTableRoutes, { prefix: "/api/campaigns" });
-    await gm.register(streamRoutes, { prefix: "/api/stream" });
-    await gm.register(fileUploadRoutes, { prefix: "/api/uploads" });
-    await gm.register(adminRoutes, { prefix: "/api/admin" });
+  // Everything else requires a logged-in user.
+  await app.register(async (authed) => {
+    authed.addHook("preHandler", authed.requireAuth);
+
+    // Self-managed authorization (per-route guards inside the plugin):
+    //  - campaigns: list/create/join are user-scoped; :id routes guard by role.
+    //  - player/dice: member-gated (any role). stream: DM-gated.
+    await authed.register(campaignRoutes, { prefix: "/api/campaigns" });
+    await authed.register(playerRoutes, { prefix: "/api/campaigns" });
+    await authed.register(diceRoutes, { prefix: "/api/campaigns" });
+    await authed.register(streamRoutes, { prefix: "/api/stream" });
+
+    // DM-only, campaign-scoped editing tools (gated for the whole group).
+    await authed.register(async (dm) => {
+      dm.addHook("preHandler", dm.requireCampaignRole("dm"));
+      await dm.register(layoutRoutes, { prefix: "/api/campaigns" });
+      await dm.register(broadcastRoutes, { prefix: "/api/campaigns" });
+      await dm.register(partyRoutes, { prefix: "/api/campaigns" });
+      await dm.register(combatRoutes, { prefix: "/api/campaigns" });
+      await dm.register(sessionRoutes, { prefix: "/api/campaigns" });
+      await dm.register(shopRoutes, { prefix: "/api/campaigns" });
+      await dm.register(weatherRoutes, { prefix: "/api/campaigns" });
+      await dm.register(calendarRoutes, { prefix: "/api/campaigns" });
+      await dm.register(logRoutes, { prefix: "/api/campaigns" });
+      await dm.register(locationRoutes, { prefix: "/api/campaigns" });
+      await dm.register(clockRoutes, { prefix: "/api/campaigns" });
+      await dm.register(rollTableRoutes, { prefix: "/api/campaigns" });
+    });
+
+    // Cross-campaign DM tools (require a DM membership somewhere).
+    await authed.register(async (dmAny) => {
+      dmAny.addHook("preHandler", dmAny.requireAnyDm);
+      await dmAny.register(npcRoutes, { prefix: "/api/npcs" });
+      await dmAny.register(monsterRoutes, { prefix: "/api/monsters" });
+      await dmAny.register(fileUploadRoutes, { prefix: "/api/uploads" });
+      await dmAny.register(adminRoutes, { prefix: "/api/admin" });
+    });
   });
 
   app.get("/api/health", async () => ({ ok: true, env: env.NODE_ENV }));

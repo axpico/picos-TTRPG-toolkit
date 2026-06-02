@@ -1,11 +1,15 @@
 import { z } from "zod";
+import { role } from "./membership.js";
 
 export const campaign = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string().nullable(),
   tags: z.array(z.string()),
-  shareToken: z.string(),
+  // Only populated for DMs; null for players.
+  joinCode: z.string().nullable(),
+  // The requesting user's role in this campaign (set by the route).
+  myRole: role.optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

@@ -2,6 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Campaign, CreateCampaignInput, UpdateCampaignInput } from "@toolkit/shared";
 import { api } from "../api/client.js";
 
+const invalidateAll = (qc: ReturnType<typeof useQueryClient>) => {
+  qc.invalidateQueries({ queryKey: ["campaigns"] });
+  qc.invalidateQueries({ queryKey: ["auth"] }); // memberships live on /me
+};
+
 export function useCampaigns() {
   return useQuery({
     queryKey: ["campaigns"],
@@ -22,7 +27,16 @@ export function useCreateCampaign() {
   return useMutation({
     mutationFn: (input: CreateCampaignInput) =>
       api.post<Campaign>("/api/campaigns", input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["campaigns"] }),
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
+export function useJoinCampaign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (joinCode: string) =>
+      api.post<Campaign>("/api/campaigns/join", { joinCode }),
+    onSuccess: () => invalidateAll(qc),
   });
 }
 
@@ -42,15 +56,15 @@ export function useDeleteCampaign() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.delete(`/api/campaigns/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["campaigns"] }),
+    onSuccess: () => invalidateAll(qc),
   });
 }
 
-export function useRotateShareToken() {
+export function useRotateJoinCode() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      api.post<Campaign>(`/api/campaigns/${id}/share-token/rotate`),
+      api.post<Campaign>(`/api/campaigns/${id}/join-code/rotate`),
     onSuccess: (c) => {
       qc.setQueryData(["campaigns", c.id], c);
       qc.invalidateQueries({ queryKey: ["campaigns"] });

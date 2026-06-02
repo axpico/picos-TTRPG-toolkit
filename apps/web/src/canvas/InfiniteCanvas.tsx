@@ -2,7 +2,6 @@ import { useRef } from "react";
 import { TransformWrapper, TransformComponent, type ReactZoomPanPinchRef } from "react-zoom-pan-pinch";
 import { useCanvasStore } from "./store.js";
 import { Widget } from "./Widget.js";
-import { StickyLayer } from "../modules/sticky/StickyLayer.js";
 
 interface Props {
   campaignId: string;
@@ -72,7 +71,6 @@ export function InfiniteCanvas({ campaignId }: Props) {
             {items.map((item) => (
               <Widget key={item.instanceId} campaignId={campaignId} item={item} />
             ))}
-            <StickyLayer campaignId={campaignId} />
           </div>
         </TransformComponent>
       </TransformWrapper>

@@ -10,6 +10,7 @@ export function toPartyDto(row: DbPartyMember): PartyDto {
   return {
     id: row.id,
     campaignId: row.campaignId,
+    userId: row.userId,
     name: row.name,
     playerName: row.playerName,
     hp: row.hp,

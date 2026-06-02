@@ -1,31 +1,12 @@
-import { useParams, useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import type {
-  Broadcast,
-  Calendar,
-  Encounter,
-  PartyMember,
-  PartyMemberStatus,
-  PublicLocation,
-  RollTableResult,
-  Weather,
-} from "@toolkit/shared";
-import { api } from "../api/client.js";
+import { Link, useParams } from "react-router-dom";
+import type { PartyMemberStatus, PublicLocation } from "@toolkit/shared";
 import { useBroadcast } from "../hooks/useBroadcast.js";
+import { useLogout } from "../auth/useAuth.js";
+import { ThemeControl } from "../theme/ThemePanel.js";
+import { usePlayerState } from "./usePlayer.js";
+import { DicePanel } from "./DicePanel.js";
+import { MyCharacterPanel } from "./MyCharacterPanel.js";
 import clsx from "clsx";
-
-interface PlayerState {
-  campaign: { id: string; name: string };
-  broadcasts: Broadcast[];
-  data: {
-    party: PartyMember[] | null;
-    combat: Encounter | null;
-    weather: Weather | null;
-    calendar: Calendar | null;
-    map: PublicLocation | null;
-    rolltable: RollTableResult | null;
-  };
-}
 
 const STATUS_LABEL: Record<PartyMemberStatus, string> = {
   active: "Active",
@@ -43,32 +24,19 @@ const STATUS_STYLE: Record<PartyMemberStatus, string> = {
 
 export function PlayerView() {
   const { campaignId = "" } = useParams<{ campaignId: string }>();
-  const [params] = useSearchParams();
-  const token = params.get("t") ?? "";
+  const logout = useLogout();
 
-  const state = useQuery({
-    queryKey: ["player", campaignId, token],
-    enabled: Boolean(campaignId && token),
-    queryFn: () =>
-      api.get<PlayerState>(`/api/player/${campaignId}?t=${encodeURIComponent(token)}`),
-  });
+  const state = usePlayerState(campaignId);
 
   useBroadcast({
-    url: `/api/player/${campaignId}/stream?t=${encodeURIComponent(token)}`,
+    url: `/api/campaigns/${campaignId}/player-stream`,
     campaignId,
   });
 
-  if (!token) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-ink-950 text-ink-300">
-        Missing share token.
-      </div>
-    );
-  }
   if (state.isError) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-ink-950 text-red-400">
-        Invalid or expired share token.
+        You don't have access to this campaign.
       </div>
     );
   }
@@ -85,10 +53,20 @@ export function PlayerView() {
 
   return (
     <div className="min-h-screen bg-ink-950 px-8 py-8 text-ink-50">
-      <header className="mb-8 flex items-baseline justify-between">
+      <header className="mb-8 flex items-center justify-between">
         <h1 className="display text-3xl font-semibold tracking-tight">{s.campaign.name}</h1>
-        <span className="text-xs uppercase tracking-widest text-ink-500">Player view</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs uppercase tracking-widest text-ink-500">Player view</span>
+          <Link to="/campaigns" className="btn-ghost">Campaigns</Link>
+          <ThemeControl />
+          <button className="btn-ghost" onClick={() => logout.mutate()}>Sign out</button>
+        </div>
       </header>
+
+      <div className="mb-4 grid gap-4 lg:grid-cols-2">
+        <MyCharacterPanel campaignId={campaignId} />
+        <DicePanel campaignId={campaignId} />
+      </div>
 
       {!anyActive && (
         <p className="rounded-md border border-ink-800 bg-ink-900 px-4 py-6 text-center text-ink-400">
