@@ -2,6 +2,7 @@ import { useState } from "react";
 import clsx from "clsx";
 import { useDiceHistory, useRollDice } from "../modules/dice/api.js";
 import { parseBreakdown } from "../modules/dice/format.js";
+import { useMe } from "../auth/useAuth.js";
 
 const QUICK = ["d4", "d6", "d8", "d10", "d12", "d20", "d100"] as const;
 
@@ -9,6 +10,8 @@ export function DicePanel({ campaignId }: { campaignId: string }) {
   const [notation, setNotation] = useState("1d20");
   const history = useDiceHistory(campaignId);
   const roll = useRollDice(campaignId);
+  const me = useMe();
+  const myId = me.data?.user?.id;
 
   const doRoll = () => {
     if (!notation.trim()) return;
@@ -46,28 +49,49 @@ export function DicePanel({ campaignId }: { campaignId: string }) {
       </div>
 
       {latest && (
-        <div className="mt-2 flex items-baseline gap-2 rounded-md bg-accent-500/10 px-3 py-2">
-          <span className="font-mono text-xs text-ink-400">{latest.notation}</span>
-          <span className="text-ink-400">→</span>
-          <span className="text-2xl font-bold text-accent-500">{latest.result}</span>
+        <div className="mt-3 flex items-center justify-center gap-3 rounded-lg border border-accent-500/30 bg-accent-500/10 px-3 py-3">
+          {/* key re-mounts on each new roll so the pop animation replays */}
+          <span key={latest.id} className="animate-[rollPop_0.4s_ease-out] text-4xl font-bold text-accent-500">
+            {latest.result}
+          </span>
+          <div className="text-left">
+            <div className="font-mono text-sm text-ink-200">{latest.notation}</div>
+            {latest.rollerName && <div className="text-xs text-ink-400">{latest.rollerName}</div>}
+          </div>
         </div>
       )}
 
-      <ul className="mt-2 max-h-48 space-y-1 overflow-auto text-sm">
-        {history.data?.slice(0, 30).map((r, i) => (
-          <li
-            key={r.id}
-            className={clsx(
-              "rounded-md border px-2 py-1",
-              i === 0 ? "border-accent-500/40 bg-accent-500/5" : "border-ink-800 bg-ink-900",
-            )}
-          >
-            <span className="font-mono text-ink-300">{r.notation}</span>
-            <span className="mx-1 text-ink-500">→</span>
-            <span className="font-bold text-ink-100">{r.result}</span>
-            <span className="ml-2 font-mono text-xs text-ink-500">{parseBreakdown(r.breakdownJson)}</span>
-          </li>
-        ))}
+      <ul className="mt-3 max-h-56 space-y-1 overflow-auto text-sm">
+        {history.data?.slice(0, 40).map((r, i) => {
+          const mine = Boolean(myId && r.userId === myId);
+          return (
+            <li
+              key={r.id}
+              className={clsx(
+                "rounded-md border px-2 py-1",
+                i === 0 ? "border-accent-500/40 bg-accent-500/5" : "border-ink-800 bg-ink-900",
+              )}
+            >
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-mono text-ink-300">{r.notation}</span>
+                <span className="text-ink-500">→</span>
+                <span className="font-bold text-ink-100">{r.result}</span>
+                <span
+                  className={clsx(
+                    "ml-auto shrink-0 text-xs",
+                    mine ? "font-medium text-accent-400" : "text-ink-500",
+                  )}
+                >
+                  {mine ? "You" : r.rollerName ?? "—"}
+                </span>
+              </div>
+              <div className="font-mono text-xs text-ink-600">{parseBreakdown(r.breakdownJson)}</div>
+            </li>
+          );
+        })}
+        {history.data?.length === 0 && (
+          <li className="py-2 text-center text-xs text-ink-500">No rolls yet.</li>
+        )}
       </ul>
     </section>
   );

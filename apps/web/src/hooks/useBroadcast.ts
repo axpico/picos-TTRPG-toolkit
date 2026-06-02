@@ -3,11 +3,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { SSEEvent } from "@toolkit/shared";
 
 type Handler = (event: SSEEvent) => void;
+export type ConnectionStatus = "live" | "reconnecting";
 
 interface Options {
   url: string;
   campaignId: string;
   onEvent?: Handler;
+  /** Connection lifecycle: "live" on open, "reconnecting" on error. */
+  onStatus?: (status: ConnectionStatus) => void;
 }
 
 /**
@@ -15,13 +18,16 @@ interface Options {
  * invalidation matching common resource families (party, log, broadcasts).
  * Per-module handlers can be supplied via `onEvent` for custom behavior.
  */
-export function useBroadcast({ url, campaignId, onEvent }: Options) {
+export function useBroadcast({ url, campaignId, onEvent, onStatus }: Options) {
   const qc = useQueryClient();
   const handlerRef = useRef(onEvent);
   handlerRef.current = onEvent;
+  const statusRef = useRef(onStatus);
+  statusRef.current = onStatus;
 
   useEffect(() => {
     const source = new EventSource(url, { withCredentials: true });
+    source.onopen = () => statusRef.current?.("live");
 
     const dispatch = (event: SSEEvent) => {
       if (event.type.startsWith("party.")) {
@@ -103,6 +109,7 @@ export function useBroadcast({ url, campaignId, onEvent }: Options) {
     source.onerror = () => {
       // The browser will auto-reconnect. Surface in console for visibility.
       console.warn("[sse] connection error, browser will reconnect");
+      statusRef.current?.("reconnecting");
     };
 
     return () => {

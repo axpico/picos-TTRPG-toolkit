@@ -8,8 +8,8 @@ interface ModalProps {
   children: ReactNode;
   /** Tailwind width class for the panel. */
   className?: string;
-  /** Vertical alignment of the panel. */
-  align?: "center" | "top";
+  /** Vertical alignment of the panel. "bottom" renders a slide-up sheet. */
+  align?: "center" | "top" | "bottom";
   labelledBy?: string;
 }
 
@@ -26,11 +26,15 @@ export function Modal({ open, onClose, children, className, align = "center", la
 
   if (!open) return null;
 
+  const isBottom = align === "bottom";
+
   return createPortal(
     <div
       className={clsx(
-        "fixed inset-0 z-50 flex justify-center bg-black/60 p-4 backdrop-blur-sm",
-        align === "center" ? "items-center" : "items-start pt-[12vh]",
+        "fixed inset-0 z-50 flex bg-black/60 backdrop-blur-sm",
+        isBottom ? "items-end justify-center" : "justify-center p-4",
+        align === "center" && "items-center",
+        align === "top" && "items-start pt-[12vh]",
       )}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -41,8 +45,10 @@ export function Modal({ open, onClose, children, className, align = "center", la
         aria-modal="true"
         aria-labelledby={labelledBy}
         className={clsx(
-          "card max-h-[85vh] w-full overflow-auto p-0 shadow-2xl",
-          "animate-[fadeIn_0.12s_ease-out]",
+          "card w-full overflow-auto shadow-2xl",
+          isBottom
+            ? "max-h-[85vh] rounded-b-none p-0 animate-[sheetUp_0.18s_ease-out]"
+            : "max-h-[85vh] p-0 animate-[fadeIn_0.12s_ease-out]",
           className ?? "max-w-md",
         )}
       >

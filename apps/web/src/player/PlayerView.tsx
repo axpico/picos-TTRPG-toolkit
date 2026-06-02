@@ -1,12 +1,17 @@
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import type { PartyMemberStatus, PublicLocation } from "@toolkit/shared";
-import { useBroadcast } from "../hooks/useBroadcast.js";
-import { useLogout } from "../auth/useAuth.js";
-import { ThemeControl } from "../theme/ThemePanel.js";
-import { usePlayerState } from "./usePlayer.js";
-import { DicePanel } from "./DicePanel.js";
-import { MyCharacterPanel } from "./MyCharacterPanel.js";
+import type { PartyMemberStatus } from "@toolkit/shared";
 import clsx from "clsx";
+import { useBroadcast, type ConnectionStatus } from "../hooks/useBroadcast.js";
+import { useLogout, useMe } from "../auth/useAuth.js";
+import { ThemeControl } from "../theme/ThemePanel.js";
+import { HpBar } from "../modules/shared.js";
+import { EmptyState } from "../components/EmptyState.js";
+import { Skeleton } from "../components/Skeleton.js";
+import { usePlayerState } from "./usePlayer.js";
+import { PlayerDock } from "./PlayerDock.js";
+import { MapStage } from "./MapStage.js";
+import { formatClock, formatGameDate } from "./format.js";
 
 const STATUS_LABEL: Record<PartyMemberStatus, string> = {
   active: "Active",
@@ -25,117 +30,170 @@ const STATUS_STYLE: Record<PartyMemberStatus, string> = {
 export function PlayerView() {
   const { campaignId = "" } = useParams<{ campaignId: string }>();
   const logout = useLogout();
+  const me = useMe();
+  const myId = me.data?.user?.id;
+  const [status, setStatus] = useState<ConnectionStatus>("reconnecting");
 
   const state = usePlayerState(campaignId);
 
   useBroadcast({
     url: `/api/campaigns/${campaignId}/player-stream`,
     campaignId,
+    onStatus: setStatus,
   });
+
+  // Brief accent ring when the shared state changes.
+  const [pulse, setPulse] = useState(false);
+  const lastUpdate = useRef(0);
+  useEffect(() => {
+    if (state.dataUpdatedAt && state.dataUpdatedAt !== lastUpdate.current) {
+      lastUpdate.current = state.dataUpdatedAt;
+      setPulse(true);
+      const t = setTimeout(() => setPulse(false), 700);
+      return () => clearTimeout(t);
+    }
+  }, [state.dataUpdatedAt]);
+
+  const header = (
+    <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-ink-800/80 bg-ink-950/70 px-4 py-3 backdrop-blur sm:px-6">
+      <div className="flex min-w-0 items-center gap-2">
+        <span
+          className={clsx(
+            "h-2 w-2 shrink-0 rounded-full",
+            status === "live" ? "animate-pulse bg-emerald-400" : "bg-amber-400",
+          )}
+          title={status === "live" ? "Live" : "Reconnecting…"}
+        />
+        <h1 className="display truncate text-xl font-semibold tracking-tight sm:text-2xl">
+          {state.data?.campaign.name ?? "…"}
+        </h1>
+      </div>
+      <div className="flex items-center gap-2">
+        <Link to="/campaigns" className="btn-ghost hidden sm:inline-flex">Campaigns</Link>
+        <ThemeControl />
+        <button className="btn-ghost" onClick={() => logout.mutate()}>Sign out</button>
+      </div>
+    </header>
+  );
 
   if (state.isError) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-ink-950 text-red-400">
-        You don't have access to this campaign.
+      <div className="min-h-screen">
+        {header}
+        <div className="flex min-h-[60vh] items-center justify-center px-4 text-center text-red-400">
+          You don't have access to this campaign.
+        </div>
       </div>
     );
   }
-  if (state.isLoading || !state.data) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-ink-950 text-ink-400">
-        Connecting…
-      </div>
-    );
-  }
-
-  const s = state.data;
-  const anyActive = s.broadcasts.some((b) => b.active);
 
   return (
-    <div className="min-h-screen bg-ink-950 px-8 py-8 text-ink-50">
-      <header className="mb-8 flex items-center justify-between">
-        <h1 className="display text-3xl font-semibold tracking-tight">{s.campaign.name}</h1>
-        <div className="flex items-center gap-2">
-          <span className="text-xs uppercase tracking-widest text-ink-500">Player view</span>
-          <Link to="/campaigns" className="btn-ghost">Campaigns</Link>
-          <ThemeControl />
-          <button className="btn-ghost" onClick={() => logout.mutate()}>Sign out</button>
-        </div>
-      </header>
+    <div className="min-h-screen pb-20 lg:pb-0">
+      {header}
+      <div className="mx-auto grid max-w-7xl gap-4 px-4 py-6 sm:px-6 lg:grid-cols-[1fr_360px]">
+        {/* Stage */}
+        <main
+          className={clsx(
+            "min-w-0 space-y-4 rounded-xl",
+            pulse && "animate-[stagePulse_0.7s_ease-out]",
+          )}
+        >
+          {state.isLoading || !state.data ? (
+            <>
+              <Skeleton className="h-10 w-1/2" />
+              <Skeleton className="h-[40vh]" />
+              <Skeleton className="h-32" />
+            </>
+          ) : (
+            <StageContent s={state.data} myId={myId} />
+          )}
+        </main>
 
-      <div className="mb-4 grid gap-4 lg:grid-cols-2">
-        <MyCharacterPanel campaignId={campaignId} />
-        <DicePanel campaignId={campaignId} />
+        {/* Dock (desktop sidebar + mobile bottom sheets) */}
+        <PlayerDock campaignId={campaignId} />
       </div>
+    </div>
+  );
+}
 
-      {!anyActive && (
-        <p className="rounded-md border border-ink-800 bg-ink-900 px-4 py-6 text-center text-ink-400">
-          Waiting for the Game Master to share something…
-        </p>
-      )}
+function StageContent({
+  s,
+  myId,
+}: {
+  s: NonNullable<ReturnType<typeof usePlayerState>["data"]>;
+  myId: string | undefined;
+}) {
+  const { calendar, weather, rolltable, map, combat, party } = s.data;
+  const anyActive = s.broadcasts.some((b) => b.active);
 
-      {s.data.calendar && (
-        <section className="card mb-4 p-4">
-          <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-ink-300">
-            Date & Time
-          </h2>
-          <div className="text-lg font-semibold">
-            {s.data.calendar.currentDay}{" "}
-            {s.data.calendar.definition.monthNames[s.data.calendar.currentMonth - 1] ??
-              `Month ${s.data.calendar.currentMonth}`}{" "}
-            {s.data.calendar.currentYear}
-          </div>
-          <div className="font-mono text-sm text-ink-300">
-            {String(s.data.calendar.currentHour).padStart(2, "0")}:
-            {String(s.data.calendar.currentMinute).padStart(2, "0")}
-          </div>
+  if (!anyActive) {
+    return (
+      <EmptyState
+        icon="🎲"
+        title="Waiting for the Game Master"
+        description="Whatever the GM shares — maps, initiative, the scene — will appear here."
+      />
+    );
+  }
+
+  return (
+    <>
+      {(calendar || weather) && (
+        <section className="card flex flex-wrap items-center gap-x-6 gap-y-2 p-3 text-sm">
+          {calendar && (
+            <div className="flex items-baseline gap-2">
+              <span className="text-xs uppercase tracking-wide text-ink-500">Date</span>
+              <span className="font-medium">{formatGameDate(calendar)}</span>
+              <span className="font-mono text-ink-300">{formatClock(calendar)}</span>
+            </div>
+          )}
+          {weather && (
+            <div className="flex items-baseline gap-2">
+              <span className="text-xs uppercase tracking-wide text-ink-500">Weather</span>
+              <span className="font-medium">{weather.current.condition}</span>
+              <span className="text-ink-300">{weather.current.temperature}</span>
+              {weather.current.description && (
+                <span className="text-ink-400">— {weather.current.description}</span>
+              )}
+            </div>
+          )}
         </section>
       )}
 
-      {s.data.rolltable && (
-        <section className="card mb-4 border-accent-500/40 bg-accent-500/5 p-4">
-          <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-ink-300">
-            {s.data.rolltable.tableName}
+      {rolltable && (
+        <section className="card border-accent-500/40 bg-accent-500/5 p-5 text-center animate-[revealIn_0.3s_ease-out]">
+          <h2 className="mb-1 text-xs font-medium uppercase tracking-widest text-ink-400">
+            {rolltable.tableName}
           </h2>
-          <div className="text-lg font-semibold text-accent-400">{s.data.rolltable.text}</div>
+          <div className="display text-2xl font-semibold text-accent-400">{rolltable.text}</div>
         </section>
       )}
 
-      {s.data.map && <MapSection map={s.data.map} />}
+      {map && <MapStage map={map} />}
 
-      {s.data.weather && (
-        <section className="card mb-4 p-4">
-          <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-ink-300">
-            Weather
-          </h2>
-          <div className="text-lg font-semibold">{s.data.weather.current.condition}</div>
-          <div className="text-sm text-ink-300">{s.data.weather.current.temperature}</div>
-          <p className="mt-1 text-sm text-ink-200">{s.data.weather.current.description}</p>
-        </section>
-      )}
-
-      {s.data.combat && (
-        <section className="card mb-4 p-4">
+      {combat && (
+        <section className="card p-4">
           <header className="mb-3 flex items-baseline justify-between">
             <h2 className="text-sm font-medium uppercase tracking-wide text-ink-300">
-              Initiative — {s.data.combat.name}
+              Initiative — {combat.name}
             </h2>
-            <span className="text-xs text-ink-500">Round {s.data.combat.round}</span>
+            <span className="chip">Round {combat.round}</span>
           </header>
           <ol className="space-y-1">
-            {s.data.combat.combatants.map((c, idx) => (
+            {combat.combatants.map((c, idx) => (
               <li
                 key={c.id}
                 className={clsx(
-                  "flex items-center justify-between rounded-md border px-3 py-1.5",
-                  idx === s.data.combat!.currentTurn
-                    ? "border-accent-500 bg-accent-500/10"
+                  "flex items-center justify-between rounded-md border px-3 py-2 transition-colors",
+                  idx === combat.currentTurn
+                    ? "border-accent-500 bg-accent-500/15"
                     : "border-ink-700 bg-ink-900",
                 )}
               >
                 <span className="flex items-center gap-2">
+                  {idx === combat.currentTurn && <span className="text-accent-400">▸</span>}
                   <span className="font-mono text-xs text-ink-400">{c.initiative}</span>
-                  <span>{c.name}</span>
+                  <span className="font-medium">{c.name}</span>
                   {c.isPC && <span className="chip">PC</span>}
                 </span>
                 {c.conditions.length > 0 && (
@@ -143,149 +201,45 @@ export function PlayerView() {
                 )}
               </li>
             ))}
-            {s.data.combat.combatants.length === 0 && (
-              <li className="text-sm text-ink-400">No combatants.</li>
-            )}
+            {combat.combatants.length === 0 && <li className="text-sm text-ink-400">No combatants.</li>}
           </ol>
         </section>
       )}
 
-      {s.data.party && (
+      {party && (
         <section className="card p-4">
-          <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-300">
-            Party
-          </h2>
-          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {s.data.party.map((m) => (
-              <li
-                key={m.id}
-                className="flex items-center justify-between rounded-md border border-ink-700 bg-ink-900 px-3 py-2"
-              >
-                <div>
-                  <div className="font-medium">{m.name}</div>
-                  {m.playerName && (
-                    <div className="text-xs text-ink-400">{m.playerName}</div>
+          <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-300">Party</h2>
+          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {party.map((m) => {
+              const mine = Boolean(myId && m.userId === myId);
+              return (
+                <li
+                  key={m.id}
+                  className={clsx(
+                    "rounded-md border px-3 py-2",
+                    mine ? "border-accent-500/60 bg-accent-500/5" : "border-ink-700 bg-ink-900",
                   )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-sm">{m.hp}/{m.hpMax}</span>
-                  <span
-                    className={clsx(
-                      "rounded-full px-2 py-0.5 text-xs",
-                      STATUS_STYLE[m.status],
-                    )}
-                  >
-                    {STATUS_LABEL[m.status]}
-                  </span>
-                </div>
-              </li>
-            ))}
-            {s.data.party.length === 0 && (
-              <li className="text-ink-400">No party members listed.</li>
-            )}
+                >
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      {m.name}
+                      {mine && <span className="chip">You</span>}
+                    </span>
+                    <span className={clsx("rounded-full px-2 py-0.5 text-xs", STATUS_STYLE[m.status])}>
+                      {STATUS_LABEL[m.status]}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1"><HpBar hp={m.hp} hpMax={m.hpMax} /></div>
+                    <span className="shrink-0 font-mono text-xs text-ink-300">{m.hp}/{m.hpMax}</span>
+                  </div>
+                </li>
+              );
+            })}
+            {party.length === 0 && <li className="text-ink-400">No party members listed.</li>}
           </ul>
         </section>
       )}
-    </div>
-  );
-}
-
-/**
- * Renders the broadcasted map. Pins are pre-filtered server-side (hidden pins
- * are stripped before sending to the player). Reveals are rectangular cutouts
- * in a black overlay — when there are no reveals, the full map shows.
- */
-function MapSection({ map }: { map: PublicLocation }) {
-  const hasReveals = map.reveals.some((r) => r.mode === "reveal");
-  return (
-    <section className="card mb-4 overflow-hidden">
-      <header className="border-b border-ink-700 px-4 py-2">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-ink-300">
-          {map.name}
-        </h2>
-        {map.playerNotes && (
-          <p className="mt-1 text-sm text-ink-200">{map.playerNotes}</p>
-        )}
-      </header>
-      {map.imageUrl ? (
-        <div className="relative inline-block max-w-full">
-          <img
-            src={map.imageUrl}
-            alt={map.name}
-            draggable={false}
-            className="block max-w-full"
-          />
-          {/* Fog-of-war: black overlay with reveal/hide cutouts. */}
-          {hasReveals && (
-            <svg
-              className="pointer-events-none absolute inset-0 h-full w-full"
-              viewBox="0 0 1 1"
-              preserveAspectRatio="none"
-            >
-              <defs>
-                <mask id="fog-mask" maskContentUnits="objectBoundingBox">
-                  {/* Start opaque (everything obscured). */}
-                  <rect x="0" y="0" width="1" height="1" fill="white" />
-                  {/* Reveal rectangles cut holes (black = transparent in mask). */}
-                  {map.reveals
-                    .filter((r) => r.mode === "reveal")
-                    .map((r) => (
-                      <rect
-                        key={r.id}
-                        x={r.x}
-                        y={r.y}
-                        width={r.w}
-                        height={r.h}
-                        fill="black"
-                      />
-                    ))}
-                  {/* Hide rectangles cover previously revealed areas. */}
-                  {map.reveals
-                    .filter((r) => r.mode === "hide")
-                    .map((r) => (
-                      <rect
-                        key={r.id}
-                        x={r.x}
-                        y={r.y}
-                        width={r.w}
-                        height={r.h}
-                        fill="white"
-                      />
-                    ))}
-                </mask>
-              </defs>
-              <rect
-                x="0"
-                y="0"
-                width="1"
-                height="1"
-                fill="rgba(0,0,0,0.92)"
-                mask="url(#fog-mask)"
-              />
-            </svg>
-          )}
-          {/* Pins on top of fog. */}
-          {map.pins.map((p) => (
-            <div
-              key={p.id}
-              className="absolute -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${p.x * 100}%`, top: `${p.y * 100}%` }}
-            >
-              <div
-                className="h-4 w-4 rounded-full border-2 border-black/70 shadow"
-                style={{ backgroundColor: p.color }}
-              />
-              {p.label && (
-                <span className="absolute left-4 top-0 whitespace-nowrap rounded bg-black/70 px-1.5 py-0.5 text-xs text-white">
-                  {p.label}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="p-6 text-center text-sm text-ink-400">No map image.</div>
-      )}
-    </section>
+    </>
   );
 }

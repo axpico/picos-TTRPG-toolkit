@@ -9,6 +9,7 @@ export const diceRoll = z.object({
   id: z.string(),
   campaignId: z.string().nullable(),
   userId: z.string().nullable(),
+  rollerName: z.string().nullable(),
   notation: z.string(),
   result: z.number(),
   breakdownJson: z.string(),

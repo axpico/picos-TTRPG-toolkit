@@ -7,11 +7,14 @@ import { rollNotation } from "../lib/dice.js";
 
 const cidParams = z.object({ id: z.string().min(1) });
 
-function toDiceDto(r: DbDiceRoll) {
+type Roller = { displayName: string | null; username: string } | null;
+
+function toDiceDto(r: DbDiceRoll, roller: Roller) {
   return {
     id: r.id,
     campaignId: r.campaignId,
     userId: r.userId,
+    rollerName: roller ? roller.displayName ?? roller.username : null,
     notation: r.notation,
     result: r.result,
     breakdownJson: r.breakdownJson,
@@ -29,8 +32,9 @@ export const diceRoutes: FastifyPluginAsync = async (app) => {
       where: { campaignId: id },
       orderBy: { createdAt: "desc" },
       take: 200,
+      include: { user: { select: { displayName: true, username: true } } },
     });
-    return rows.map(toDiceDto);
+    return rows.map((r) => toDiceDto(r, r.user));
   });
 
   app.post("/:id/dice", member, async (req, reply) => {
@@ -47,8 +51,10 @@ export const diceRoutes: FastifyPluginAsync = async (app) => {
         label: body.label ?? null,
       },
     });
-    app.bus.emit(id, { type: "dice.roll", campaignId: id, payload: { roll: toDiceDto(created) } });
+    const roller: Roller = { displayName: req.user!.displayName, username: req.user!.username };
+    const dto = toDiceDto(created, roller);
+    app.bus.emit(id, { type: "dice.roll", campaignId: id, payload: { roll: dto } });
     reply.code(201);
-    return toDiceDto(created);
+    return dto;
   });
 };
