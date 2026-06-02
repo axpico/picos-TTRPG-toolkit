@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { statBlock } from "./statblock.js";
 
 export const npc = z.object({
   id: z.string(),
@@ -12,6 +13,7 @@ export const npc = z.object({
   portraitAssetId: z.string().nullable(),
   favorite: z.boolean(),
   locationId: z.string().nullable(),
+  stats: statBlock,
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -28,6 +30,7 @@ export const createNpcInput = z.object({
   favorite: z.boolean().optional(),
   locationId: z.string().optional(),
   campaignId: z.string().optional(),
+  stats: statBlock.optional(),
 });
 export type CreateNpcInput = z.infer<typeof createNpcInput>;
 

@@ -17,6 +17,7 @@ export * from "./log.js";
 export * from "./broadcast.js";
 export * from "./sse.js";
 export * from "./dice.js";
+export * from "./statblock.js";
 export * from "./location.js";
 export * from "./clock.js";
 export * from "./rolltable.js";

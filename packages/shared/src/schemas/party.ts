@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { statBlock } from "./statblock.js";
 
 export const partyMemberStatus = z.enum(["active", "down", "stable", "dead"]);
 export type PartyMemberStatus = z.infer<typeof partyMemberStatus>;
@@ -16,6 +17,7 @@ export const partyMember = z.object({
   conditions: z.array(z.string()),
   notes: z.string().nullable(),
   portraitAssetId: z.string().nullable(),
+  stats: statBlock,
   order: z.number().int(),
 });
 export type PartyMember = z.infer<typeof partyMember>;
@@ -28,6 +30,7 @@ export const createPartyMemberInput = z.object({
   status: partyMemberStatus.optional(),
   conditions: z.array(z.string().min(1).max(60)).max(40).optional(),
   notes: z.string().max(4000).optional(),
+  stats: statBlock.optional(),
 });
 export type CreatePartyMemberInput = z.infer<typeof createPartyMemberInput>;
 

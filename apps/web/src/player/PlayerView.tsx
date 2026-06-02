@@ -7,6 +7,7 @@ import { useLogout, useMe } from "../auth/useAuth.js";
 import { ThemeControl } from "../theme/ThemePanel.js";
 import { HpBar } from "../modules/shared.js";
 import { EmptyState } from "../components/EmptyState.js";
+import { BuyMeCoffee } from "../components/BuyMeCoffee.js";
 import { Skeleton } from "../components/Skeleton.js";
 import { usePlayerState } from "./usePlayer.js";
 import { PlayerDock } from "./PlayerDock.js";
@@ -70,6 +71,7 @@ export function PlayerView() {
       </div>
       <div className="flex items-center gap-2">
         <Link to="/campaigns" className="btn-ghost hidden sm:inline-flex">Campaigns</Link>
+        <BuyMeCoffee />
         <ThemeControl />
         <button className="btn-ghost" onClick={() => logout.mutate()}>Sign out</button>
       </div>

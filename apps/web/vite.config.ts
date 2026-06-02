@@ -20,5 +20,9 @@ export default defineConfig(({ mode }) => {
       outDir: "dist",
       sourcemap: true,
     },
+    test: {
+      // Component/store tests touch document, localStorage, etc.; run them in jsdom.
+      environment: "jsdom",
+    },
   };
 });

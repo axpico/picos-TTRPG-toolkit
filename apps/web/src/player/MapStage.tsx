@@ -1,5 +1,30 @@
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
-import type { PublicLocation } from "@toolkit/shared";
+import type { MapGrid, PublicLocation } from "@toolkit/shared";
+import { TokenView } from "../modules/map/TokenView.js";
+
+/** Normalized grid overlay (viewBox 0..1) drawn over the player's map. */
+function PlayerGrid({ grid }: { grid: MapGrid }) {
+  if (!grid.visible || grid.size <= 0) return null;
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (let x = grid.offsetX; x <= 1; x += grid.size) xs.push(x);
+  for (let y = grid.offsetY; y <= 1; y += grid.size) ys.push(y);
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0 h-full w-full"
+      viewBox="0 0 1 1"
+      preserveAspectRatio="none"
+      aria-hidden
+    >
+      {xs.map((x) => (
+        <line key={`x${x}`} x1={x} y1={0} x2={x} y2={1} stroke={grid.color} strokeWidth={0.002} />
+      ))}
+      {ys.map((y) => (
+        <line key={`y${y}`} x1={0} y1={y} x2={1} y2={y} stroke={grid.color} strokeWidth={0.002} />
+      ))}
+    </svg>
+  );
+}
 
 /**
  * The broadcasted map, zoomable/pannable for players. Pins are pre-filtered
@@ -75,6 +100,12 @@ export function MapStage({ map }: { map: PublicLocation }) {
                       </span>
                     )}
                   </div>
+                ))}
+                {/* Grid overlay (drawn above the image, below tokens). */}
+                {map.grid && <PlayerGrid grid={map.grid} />}
+                {/* Tokens — already fog/visibility-filtered server-side. */}
+                {map.tokens.map((t) => (
+                  <TokenView key={t.id} token={t} />
                 ))}
               </div>
             </TransformComponent>

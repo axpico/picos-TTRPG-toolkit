@@ -64,6 +64,8 @@ export const locationRoutes: FastifyPluginAsync = async (app) => {
           : {}),
         ...(body.pins !== undefined ? { pinsJson: JSON.stringify(body.pins) } : {}),
         ...(body.reveals !== undefined ? { revealsJson: JSON.stringify(body.reveals) } : {}),
+        ...(body.tokens !== undefined ? { tokensJson: JSON.stringify(body.tokens) } : {}),
+        ...(body.grid !== undefined ? { gridJson: body.grid ? JSON.stringify(body.grid) : null } : {}),
       },
     });
     const dto = toLocationDto(updated);

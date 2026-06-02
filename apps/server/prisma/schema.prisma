@@ -109,6 +109,7 @@ model PartyMember {
   conditionsJson  String   @default("[]")
   notes           String?
   portraitAssetId String?
+  statsJson       String   @default("{}")
   order           Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -146,6 +147,7 @@ model NPC {
   favorite        Boolean    @default(false)
   locationId      String?
   location        Location?  @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  statsJson       String     @default("{}")
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 }
@@ -177,6 +179,10 @@ model Location {
   pinsJson     String   @default("[]")
   // Polygon/rect fog-of-war reveals; player view subtracts hidden, then composites.
   revealsJson  String   @default("[]")
+  // Movable tokens (PCs/monsters); fog-filtered out of the player view.
+  tokensJson   String   @default("[]")
+  // Optional snap grid config (null = no grid).
+  gridJson     String?
   npcs         NPC[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

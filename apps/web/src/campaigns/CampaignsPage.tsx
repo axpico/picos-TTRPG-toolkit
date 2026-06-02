@@ -9,6 +9,7 @@ import {
 } from "./useCampaigns.js";
 import { useLogout, useMe } from "../auth/useAuth.js";
 import { ThemeControl } from "../theme/ThemePanel.js";
+import { BuyMeCoffee } from "../components/BuyMeCoffee.js";
 import { useConfirm } from "../components/ConfirmDialog.js";
 import { useToast } from "../components/Toast.js";
 import { EmptyState } from "../components/EmptyState.js";
@@ -70,6 +71,7 @@ export function CampaignsPage() {
         <h1 className="display text-lg font-semibold tracking-tight">Pico's TTRPG Toolkit</h1>
         <div className="flex items-center gap-3">
           {displayName && <span className="text-sm text-ink-400">{displayName}</span>}
+          <BuyMeCoffee />
           <ThemeControl />
           <button className="btn-ghost" onClick={() => logout.mutate()}>Sign out</button>
         </div>

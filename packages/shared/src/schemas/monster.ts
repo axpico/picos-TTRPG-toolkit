@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { statBlock } from "./statblock.js";
 
 export const monster = z.object({
   id: z.string(),
@@ -7,7 +8,7 @@ export const monster = z.object({
   type: z.string().nullable(),
   environment: z.string().nullable(),
   challenge: z.string().nullable(),
-  stats: z.record(z.unknown()),
+  stats: statBlock,
   notes: z.string().nullable(),
   tags: z.array(z.string()),
   createdAt: z.string(),
@@ -20,7 +21,7 @@ export const createMonsterInput = z.object({
   type: z.string().max(60).optional(),
   environment: z.string().max(60).optional(),
   challenge: z.string().max(40).optional(),
-  stats: z.record(z.unknown()).optional(),
+  stats: statBlock.optional(),
   notes: z.string().max(8000).optional(),
   tags: z.array(z.string().min(1).max(40)).max(40).optional(),
   campaignId: z.string().optional(),
