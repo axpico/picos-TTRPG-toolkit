@@ -11,7 +11,7 @@
   "scripts": {
     "start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start.ps1",
     "start:bash": "bash scripts/start.sh",
-    "dev": "concurrently -n server,web -c blue,magenta \"npm:dev -w apps/server\" \"npm:dev -w apps/web\"",
+    "dev": "concurrently -n server,web -c blue,magenta \"npm:dev -w apps/server\" \"npm:dev -w apps/web -- --host\"",
     "build": "npm run build -w packages/shared && npm run build -w apps/server && npm run build -w apps/web",
     "serve": "npm run start -w apps/server",
     "migrate": "npm run migrate -w apps/server",
