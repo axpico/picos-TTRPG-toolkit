@@ -12,7 +12,7 @@ const REVEALS = JSON.stringify([
 ]);
 // One token inside the revealed quadrant, one outside it (under fog).
 const TOKENS = JSON.stringify([
-  { id: "t1", x: 0.2, y: 0.2, size: 0.04, label: "Goblin", color: "#0f0", imageAssetId: "tok-1", playerVisible: true, hp: 7, hpMax: 7 },
+  { id: "t1", x: 0.2, y: 0.2, size: 0.04, label: "Goblin", color: "#0f0", imageAssetId: "tok-1", playerVisible: true, hp: 7, hpMax: 7, ac: 15, statBlock: { ac: 15, hp: 7 } },
   { id: "t2", x: 0.8, y: 0.8, size: 0.04, label: "Lurker", color: "#f00", imageAssetId: null, playerVisible: true, hp: null, hpMax: null },
   { id: "t3", x: 0.2, y: 0.2, size: 0.04, label: "GM only", color: "#00f", imageAssetId: null, playerVisible: false, hp: null, hpMax: null },
 ]);
@@ -73,6 +73,23 @@ test("toLocationDto derives a token imageUrl from imageAssetId", () => {
   assert.equal(dto.tokens.length, 3);
   assert.equal(dto.tokens[0]!.imageUrl, "/api/files/tok-1");
   assert.equal(dto.tokens[1]!.imageUrl, null);
+});
+
+test("toLocationDto round-trips token ac and stat block (defaulting missing)", () => {
+  const dto = toLocationDto(location());
+  assert.equal(dto.tokens[0]!.ac, 15);
+  assert.equal(dto.tokens[0]!.statBlock!.ac, 15);
+  // A token saved before stats existed defaults to ac:null, statBlock:null.
+  assert.equal(dto.tokens[1]!.ac, null);
+  assert.equal(dto.tokens[1]!.statBlock, null);
+});
+
+test("toPublicLocation strips the GM stat block from tokens", () => {
+  const pub = toPublicLocation(location());
+  assert.equal(pub.tokens[0]!.statBlock, null);
+  // AC and HP still reach players.
+  assert.equal(pub.tokens[0]!.ac, 15);
+  assert.equal(pub.tokens[0]!.hp, 7);
 });
 
 test("toPublicLocation hides tokens under fog and GM-only tokens", () => {

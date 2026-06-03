@@ -3,6 +3,7 @@ import clsx from "clsx";
 import type { PartyMember, PartyMemberStatus } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { HpBar, InlineConfirm } from "../shared.js";
+import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
 import {
   useCreatePartyMember,
   useDeletePartyMember,
@@ -91,6 +92,7 @@ function PartyMemberRow({ member, onChange, onDelete }: PartyMemberRowProps) {
   const [localHpMax, setLocalHpMax] = useState(member.hpMax ?? 0);
   const [localConditions, setLocalConditions] = useState(member.conditions.join(", "));
   const [dmgInput, setDmgInput] = useState("");
+  const [sheet, setSheet] = useState(false);
 
   useEffect(() => setLocalHp(member.hp ?? 0), [member.hp]);
   useEffect(() => setLocalHpMax(member.hpMax ?? 0), [member.hpMax]);
@@ -142,8 +144,23 @@ function PartyMemberRow({ member, onChange, onDelete }: PartyMemberRowProps) {
             if (v !== (member.playerName ?? undefined)) onChange({ playerName: v });
           }}
         />
+        <button className="btn-ghost px-2 text-xs" onClick={() => setSheet(true)} title="Open character sheet">
+          Sheet
+        </button>
         <InlineConfirm onConfirm={onDelete} title="Remove from party" />
       </div>
+
+      {sheet && (
+        <CreatureSheetModal
+          open
+          onClose={() => setSheet(false)}
+          title={member.name}
+          subtitle={member.playerName ? `Played by ${member.playerName}` : null}
+          stats={member.stats}
+          hideHp
+          onChange={(next) => onChange({ stats: next })}
+        />
+      )}
 
       {/* HP row */}
       <div className="mt-2 flex items-center gap-1.5">

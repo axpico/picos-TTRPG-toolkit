@@ -15,6 +15,7 @@ const npc = (over: Partial<DbNpc> = {}): DbNpc => ({
   portraitAssetId: null,
   favorite: false,
   locationId: null,
+  statsJson: "{}",
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
   updatedAt: new Date("2026-01-01T00:00:00.000Z"),
   ...over,
@@ -29,4 +30,9 @@ test("parses tags and passes fields through", () => {
 
 test("falls back to [] on malformed tags JSON", () => {
   assert.deepEqual(toNpcDto(npc({ tagsJson: "x" })).tags, []);
+});
+
+test("parses the stat block (empty default, or stored values)", () => {
+  assert.equal(toNpcDto(npc()).stats.ac, null);
+  assert.equal(toNpcDto(npc({ statsJson: '{"ac":12}' })).stats.ac, 12);
 });

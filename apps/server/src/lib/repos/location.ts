@@ -6,6 +6,7 @@ import {
   mapReveal,
   mapToken,
   type Location as LocationDto,
+  type MapToken,
   type MapTokenDto,
   type PublicLocation,
 } from "@toolkit/shared";
@@ -22,7 +23,10 @@ function imageUrlFor(assetId: string | null): string | null {
 }
 
 export function toLocationDto(row: DbLocation): LocationDto {
-  const tokens: MapTokenDto[] = parseJsonField(row.tokensJson, tokensSchema, []).map((t) => ({
+  // parseJsonField infers zod's input type for default-bearing schemas; the
+  // runtime value is fully defaulted, so assert the output shape.
+  const stored = parseJsonField(row.tokensJson, tokensSchema, []) as MapToken[];
+  const tokens: MapTokenDto[] = stored.map((t) => ({
     ...t,
     imageUrl: imageUrlFor(t.imageAssetId),
   }));
@@ -59,9 +63,10 @@ export function toPublicLocation(row: DbLocation): PublicLocation {
     imageUrl: full.imageUrl,
     pins: full.pins.filter((p) => p.playerVisible),
     reveals: full.reveals,
-    tokens: full.tokens.filter(
-      (t) => t.playerVisible && isPointRevealed({ x: t.x, y: t.y }, full.reveals),
-    ),
+    // Players get the token disc + HP + AC, but never the full GM stat block.
+    tokens: full.tokens
+      .filter((t) => t.playerVisible && isPointRevealed({ x: t.x, y: t.y }, full.reveals))
+      .map((t) => ({ ...t, statBlock: null })),
     grid: full.grid,
   };
 }

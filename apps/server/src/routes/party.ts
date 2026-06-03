@@ -32,6 +32,7 @@ export const partyRoutes: FastifyPluginAsync = async (app) => {
         status: body.status ?? "active",
         conditionsJson: JSON.stringify(body.conditions ?? []),
         notes: body.notes ?? null,
+        statsJson: JSON.stringify(body.stats ?? {}),
         order: count,
       },
     });
@@ -57,6 +58,7 @@ export const partyRoutes: FastifyPluginAsync = async (app) => {
           ? { conditionsJson: JSON.stringify(body.conditions) }
           : {}),
         ...(body.notes !== undefined ? { notes: body.notes ?? null } : {}),
+        ...(body.stats !== undefined ? { statsJson: JSON.stringify(body.stats) } : {}),
         ...(body.order !== undefined ? { order: body.order } : {}),
       },
     });

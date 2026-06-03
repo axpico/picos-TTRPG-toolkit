@@ -50,6 +50,7 @@ export const npcRoutes: FastifyPluginAsync = async (app) => {
         favorite: body.favorite ?? false,
         locationId: body.locationId ?? null,
         campaignId: body.campaignId ?? null,
+        statsJson: JSON.stringify(body.stats ?? {}),
       },
     });
     const dto = toNpcDto(created);
@@ -84,6 +85,7 @@ export const npcRoutes: FastifyPluginAsync = async (app) => {
         ...(body.favorite !== undefined ? { favorite: body.favorite } : {}),
         ...(body.locationId !== undefined ? { locationId: body.locationId ?? null } : {}),
         ...(body.campaignId !== undefined ? { campaignId: body.campaignId ?? null } : {}),
+        ...(body.stats !== undefined ? { statsJson: JSON.stringify(body.stats) } : {}),
       },
     });
     const dto = toNpcDto(updated);

@@ -15,6 +15,7 @@ const member = (over: Partial<DbPartyMember> = {}): DbPartyMember => ({
   conditionsJson: "[]",
   notes: null,
   portraitAssetId: null,
+  statsJson: "{}",
   order: 0,
   createdAt: new Date(0),
   updatedAt: new Date(0),
@@ -43,4 +44,10 @@ test("nullable fields pass through", () => {
 test("userId (owning player) passes through", () => {
   assert.equal(toPartyDto(member({ userId: "user-1" })).userId, "user-1");
   assert.equal(toPartyDto(member({ userId: null })).userId, null);
+});
+
+test("parses the stat block (empty default, or stored values)", () => {
+  assert.equal(toPartyDto(member()).stats.ac, null);
+  assert.equal(toPartyDto(member({ statsJson: '{"ac":17,"abilities":{"str":16}}' })).stats.ac, 17);
+  assert.equal(toPartyDto(member({ statsJson: '{"abilities":{"str":16}}' })).stats.abilities.str, 16);
 });

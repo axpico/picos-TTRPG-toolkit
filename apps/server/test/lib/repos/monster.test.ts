@@ -20,12 +20,17 @@ const monster = (over: Partial<DbMonster> = {}): DbMonster => ({
 
 test("parses stats record and tags", () => {
   const dto = toMonsterDto(monster());
-  assert.deepEqual(dto.stats, { ac: 13, hp: 59 });
+  assert.equal(dto.stats.ac, 13);
+  assert.equal(dto.stats.hp, 59);
+  // Unspecified stat-block fields default rather than being dropped.
+  assert.equal(dto.stats.hpMax, null);
+  assert.deepEqual(dto.stats.actions, []);
   assert.deepEqual(dto.tags, ["dangerous"]);
 });
 
-test("falls back to {} stats and [] tags on malformed JSON", () => {
+test("falls back to an empty stat block and [] tags on malformed JSON", () => {
   const dto = toMonsterDto(monster({ statsJson: "x", tagsJson: "y" }));
-  assert.deepEqual(dto.stats, {});
+  assert.equal(dto.stats.ac, null);
+  assert.equal(dto.stats.hp, null);
   assert.deepEqual(dto.tags, []);
 });

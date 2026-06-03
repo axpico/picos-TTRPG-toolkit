@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { NPC as NpcDto } from "@toolkit/shared";
+import { emptyStatBlock, statBlock, type NPC as NpcDto, type StatBlock } from "@toolkit/shared";
 import type { NPC as DbNpc } from "@prisma/client";
 import { parseJsonField } from "../json.js";
 
@@ -18,6 +18,7 @@ export function toNpcDto(row: DbNpc): NpcDto {
     portraitAssetId: row.portraitAssetId,
     favorite: row.favorite,
     locationId: row.locationId,
+    stats: parseJsonField(row.statsJson, statBlock, emptyStatBlock()) as StatBlock,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

@@ -3,6 +3,7 @@ import clsx from "clsx";
 import type { GeneratedNpc, NPC } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { InlineConfirm } from "../shared.js";
+import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
 import {
   useCreateNpc,
   useDeleteNpc,
@@ -136,6 +137,7 @@ interface NpcRowProps {
 
 function NpcRow({ npc, onChange, onDelete }: NpcRowProps) {
   const [open, setOpen] = useState(false);
+  const [sheet, setSheet] = useState(false);
   const [localName, setLocalName] = useState(npc.name);
   const [localRole, setLocalRole] = useState(npc.role ?? "");
 
@@ -177,6 +179,9 @@ function NpcRow({ npc, onChange, onDelete }: NpcRowProps) {
           title={npc.favorite ? "Unfavorite" : "Favorite"}
         >
           ★
+        </button>
+        <button className="btn-ghost px-2 text-xs" onClick={() => setSheet(true)} title="Open stat sheet">
+          Sheet
         </button>
         <InlineConfirm onConfirm={onDelete} title="Delete NPC" />
       </div>
@@ -240,6 +245,25 @@ function NpcRow({ npc, onChange, onDelete }: NpcRowProps) {
             />
           </div>
         </div>
+      )}
+
+      {sheet && (
+        <CreatureSheetModal
+          open
+          onClose={() => setSheet(false)}
+          title={npc.name}
+          subtitle={npc.role}
+          stats={npc.stats}
+          onChange={(next) => onChange({ stats: next })}
+          flavor={
+            npc.quirk || npc.hook ? (
+              <div className="space-y-1 text-sm text-ink-300">
+                {npc.quirk && <p><span className="font-semibold text-ink-200">Quirk: </span>{npc.quirk}</p>}
+                {npc.hook && <p><span className="font-semibold text-ink-200">Hook: </span>{npc.hook}</p>}
+              </div>
+            ) : undefined
+          }
+        />
       )}
     </li>
   );

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { Monster } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { InlineConfirm } from "../shared.js";
+import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
 import {
   useCreateMonster,
   useDeleteMonster,
@@ -98,27 +99,21 @@ interface RowProps {
 
 function MonsterRow({ monster, onChange, onDelete }: RowProps) {
   const [open, setOpen] = useState(false);
+  const [sheet, setSheet] = useState(false);
   const [localName, setLocalName] = useState(monster.name);
   const [localType, setLocalType] = useState(monster.type ?? "");
   const [localChallenge, setLocalChallenge] = useState(monster.challenge ?? "");
   const [localEnvironment, setLocalEnvironment] = useState(monster.environment ?? "");
   const [localTags, setLocalTags] = useState(monster.tags.join(", "));
-  const [statsText, setStatsText] = useState(() => JSON.stringify(monster.stats, null, 2));
-  const [statsErr, setStatsErr] = useState<string | null>(null);
 
-  const commitStats = () => {
-    try {
-      const parsed = JSON.parse(statsText || "{}");
-      if (typeof parsed !== "object" || Array.isArray(parsed)) {
-        setStatsErr("Stats must be a JSON object.");
-        return;
-      }
-      onChange({ stats: parsed as Record<string, unknown> });
-      setStatsErr(null);
-    } catch (e) {
-      setStatsErr(e instanceof Error ? e.message : "Invalid JSON");
-    }
-  };
+  const s = monster.stats;
+  const preview = [
+    s.ac != null ? `AC ${s.ac}` : null,
+    s.hp != null ? `HP ${s.hp}` : null,
+    monster.challenge ? `CR ${monster.challenge}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <li className="rounded-md border border-ink-700 bg-ink-900">
@@ -155,10 +150,14 @@ function MonsterRow({ monster, onChange, onDelete }: RowProps) {
             onChange({ challenge: localChallenge || undefined })
           }
         />
+        <button className="btn-ghost px-2 text-xs" onClick={() => setSheet(true)} title="Open stat sheet">
+          Sheet
+        </button>
         <InlineConfirm onConfirm={onDelete} title="Delete creature" />
       </div>
       {open && (
         <div className="space-y-1.5 border-t border-ink-700 px-2 py-2 text-xs">
+          {preview && <div className="font-medium text-ink-300">{preview}</div>}
           <input
             className="input"
             placeholder="Environment"
@@ -184,20 +183,27 @@ function MonsterRow({ monster, onChange, onDelete }: RowProps) {
             }
           />
           <textarea
-            className="input min-h-[100px] font-mono"
-            placeholder='Stats JSON, e.g. {"AC": 14, "HP": 32, "atk": "1d8+3"}'
-            value={statsText}
-            onChange={(e) => setStatsText(e.target.value)}
-            onBlur={commitStats}
-          />
-          {statsErr && <div className="text-red-400">{statsErr}</div>}
-          <textarea
             className="input min-h-[60px]"
             placeholder="GM notes"
             defaultValue={monster.notes ?? ""}
             onBlur={(e) => onChange({ notes: e.target.value || undefined })}
           />
+          <button className="btn-primary w-full px-2 py-1.5" onClick={() => setSheet(true)}>
+            Open stat sheet
+          </button>
         </div>
+      )}
+
+      {sheet && (
+        <CreatureSheetModal
+          open
+          onClose={() => setSheet(false)}
+          title={monster.name}
+          subtitle={[monster.type, monster.environment].filter(Boolean).join(" · ") || null}
+          cr={monster.challenge}
+          stats={monster.stats}
+          onChange={(next) => onChange({ stats: next })}
+        />
       )}
     </li>
   );

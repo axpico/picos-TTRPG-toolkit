@@ -1,6 +1,5 @@
 import { z } from "zod";
-import type { PartyMember as PartyDto } from "@toolkit/shared";
-import { partyMemberStatus } from "@toolkit/shared";
+import { emptyStatBlock, partyMemberStatus, statBlock, type PartyMember as PartyDto, type StatBlock } from "@toolkit/shared";
 import type { PartyMember as DbPartyMember } from "@prisma/client";
 import { parseJsonField } from "../json.js";
 
@@ -19,6 +18,7 @@ export function toPartyDto(row: DbPartyMember): PartyDto {
     conditions: parseJsonField(row.conditionsJson, conditionsSchema, []),
     notes: row.notes,
     portraitAssetId: row.portraitAssetId,
+    stats: parseJsonField(row.statsJson, statBlock, emptyStatBlock()) as StatBlock,
     order: row.order,
   };
 }

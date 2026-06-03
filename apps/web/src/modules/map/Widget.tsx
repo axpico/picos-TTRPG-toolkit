@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import {
+  emptyStatBlock,
   isPointRevealed,
   presetTokenSize,
   snapToGrid,
@@ -10,8 +11,10 @@ import {
   type MapReveal,
   type MapToken,
   type MapTokenDto,
+  type StatBlock,
   type TokenSizePreset,
 } from "@toolkit/shared";
+import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { InlineConfirm } from "../shared.js";
 import { useBroadcasts, useSetBroadcast } from "../broadcast/api.js";
@@ -598,6 +601,8 @@ function MapEditor({ campaignId, location, tool, setTool, onChange, onUpload, up
       playerVisible: init.playerVisible ?? true,
       hp: init.hp ?? null,
       hpMax: init.hpMax ?? null,
+      ac: init.ac ?? null,
+      statBlock: init.statBlock ?? null,
       imageUrl: null,
     };
     sendTokens([...location.tokens, token]);
@@ -811,6 +816,14 @@ function MapEditor({ campaignId, location, tool, setTool, onChange, onUpload, up
                           {hiddenFromPlayers && (
                             <span className="pointer-events-none absolute -right-1 -top-1 text-[8px]" title="Hidden from players">
                               🚫
+                            </span>
+                          )}
+                          {t.ac != null && (
+                            <span
+                              className="pointer-events-none absolute -left-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full border border-ink-950 bg-sky-500 px-0.5 text-[8px] font-bold leading-none text-white shadow"
+                              title="Armor Class"
+                            >
+                              {t.ac}
                             </span>
                           )}
                           {/* Resize handle (only on the selected token, no tool active). */}
@@ -1111,6 +1124,8 @@ function TokenPanel({
   uploadAsset: ReturnType<typeof useUploadAsset>;
 }) {
   const [spawnOpen, setSpawnOpen] = useState(false);
+  const [sheetTokenId, setSheetTokenId] = useState<string | null>(null);
+  const sheetToken = tokens.find((t) => t.id === sheetTokenId) ?? null;
 
   return (
     <div>
@@ -1225,12 +1240,12 @@ function TokenPanel({
                 )}
               </div>
 
-              {/* HP */}
+              {/* HP + AC */}
               <div className="mt-2 flex items-center gap-1.5 text-ink-300">
                 <span className="w-6 text-[10px] uppercase tracking-wide text-ink-500">HP</span>
                 <input
                   type="number"
-                  className="input w-16"
+                  className="input w-14"
                   value={t.hp ?? ""}
                   placeholder="–"
                   onChange={(e) => updateToken(t.id, { hp: e.target.value === "" ? null : Number(e.target.value) })}
@@ -1238,24 +1253,50 @@ function TokenPanel({
                 <span className="text-ink-500">/</span>
                 <input
                   type="number"
-                  className="input w-16"
+                  className="input w-14"
                   value={t.hpMax ?? ""}
                   placeholder="–"
                   onChange={(e) => updateToken(t.id, { hpMax: e.target.value === "" ? null : Number(e.target.value) })}
                 />
+                <span className="ml-2 w-6 text-[10px] uppercase tracking-wide text-ink-500">AC</span>
+                <input
+                  type="number"
+                  className="input w-14"
+                  value={t.ac ?? ""}
+                  placeholder="–"
+                  onChange={(e) => updateToken(t.id, { ac: e.target.value === "" ? null : Number(e.target.value) })}
+                />
               </div>
 
-              <label className="mt-2 flex items-center gap-1.5 text-ink-300">
-                <input
-                  type="checkbox"
-                  checked={t.playerVisible}
-                  onChange={(e) => updateToken(t.id, { playerVisible: e.target.checked })}
-                />
-                Visible to players
-              </label>
+              <div className="mt-2 flex items-center justify-between">
+                <label className="flex items-center gap-1.5 text-ink-300">
+                  <input
+                    type="checkbox"
+                    checked={t.playerVisible}
+                    onChange={(e) => updateToken(t.id, { playerVisible: e.target.checked })}
+                  />
+                  Visible to players
+                </label>
+                <button className="btn-ghost px-2 py-0.5 text-[10px]" onClick={() => setSheetTokenId(t.id)}>
+                  Stat sheet
+                </button>
+              </div>
             </div>
           ))}
         </div>
+      )}
+
+      {sheetToken && (
+        <CreatureSheetModal
+          open
+          onClose={() => setSheetTokenId(null)}
+          title={sheetToken.label || "Token"}
+          subtitle="Token stat block"
+          portraitUrl={sheetToken.imageUrl}
+          stats={sheetToken.statBlock ?? emptyStatBlock()}
+          hideHp
+          onChange={(next) => updateToken(sheetToken.id, { statBlock: next, ac: next.ac })}
+        />
       )}
     </div>
   );
@@ -1272,18 +1313,6 @@ function SpawnPicker({
   const party = useParty(campaignId);
   const monsters = useMonsters({ campaignId });
 
-  const monsterHp = (stats: Record<string, unknown>): number | null => {
-    for (const k of ["hp", "HP", "hitPoints", "hit_points"]) {
-      const v = stats[k];
-      if (typeof v === "number" && Number.isFinite(v)) return Math.round(v);
-      if (typeof v === "string") {
-        const n = parseInt(v, 10);
-        if (Number.isFinite(n)) return n;
-      }
-    }
-    return null;
-  };
-
   return (
     <div className="mb-2 max-h-48 overflow-auto rounded-lg border border-ink-700 bg-ink-950/70 p-1.5 shadow-inner">
       <div className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-400/80">Party</div>
@@ -1297,8 +1326,10 @@ function SpawnPicker({
                 label: m.name,
                 hp: m.hp,
                 hpMax: m.hpMax,
+                ac: m.stats.ac,
                 imageAssetId: m.portraitAssetId,
                 color: "#34d399",
+                statBlock: m.stats,
               })
             }
           >
@@ -1314,12 +1345,21 @@ function SpawnPicker({
       <div className="mb-1 mt-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-red-400/80">Bestiary</div>
       {monsters.data?.length ? (
         monsters.data.map((m) => {
-          const hp = monsterHp(m.stats);
+          const hp = m.stats.hp;
           return (
             <button
               key={m.id}
               className="flex w-full items-center gap-2 truncate rounded-md px-2 py-1.5 text-left hover:bg-ink-800"
-              onClick={() => onSpawn({ label: m.name, hp, hpMax: hp, color: "#f87171" })}
+              onClick={() =>
+                onSpawn({
+                  label: m.name,
+                  hp: m.stats.hp,
+                  hpMax: m.stats.hpMax ?? m.stats.hp,
+                  ac: m.stats.ac,
+                  color: "#f87171",
+                  statBlock: m.stats,
+                })
+              }
             >
               <span className="h-2 w-2 shrink-0 rounded-full bg-red-400" />
               <span className="truncate">{m.name}</span>
