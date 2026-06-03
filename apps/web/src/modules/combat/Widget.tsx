@@ -6,6 +6,7 @@ import { HpBar, InlineConfirm } from "../shared.js";
 import { useParty } from "../party/api.js";
 import { useNpcs } from "../npc/api.js";
 import { useMonsters } from "../bestiary/api.js";
+import { combatantFromMonster, combatantFromNpc, combatantFromParty } from "./fromLibrary.js";
 import {
   useAddCombatant,
   useCreateEncounter,
@@ -126,42 +127,13 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
     let input: Parameters<typeof addCombatant.mutate>[0]["input"] | null = null;
     if (pickSource === "party") {
       const m = party.data?.find((x) => x.id === id);
-      if (m) {
-        input = {
-          name: m.name,
-          initiative: 0,
-          hp: m.hp,
-          hpMax: m.hpMax,
-          ac: m.stats.ac ?? undefined,
-          isPC: true,
-        };
-      }
+      if (m) input = combatantFromParty(m);
     } else if (pickSource === "npc") {
       const n = npcs.data?.find((x) => x.id === id);
-      if (n) {
-        const hp = n.stats.hp ?? n.stats.hpMax ?? undefined;
-        input = {
-          name: n.name,
-          initiative: 0,
-          hp,
-          hpMax: n.stats.hpMax ?? hp ?? undefined,
-          ac: n.stats.ac ?? undefined,
-          isPC: false,
-        };
-      }
+      if (n) input = combatantFromNpc(n);
     } else if (pickSource === "bestiary") {
       const mo = monsters.data?.find((x) => x.id === id);
-      if (mo) {
-        const hp = mo.stats.hp ?? mo.stats.hpMax ?? undefined;
-        input = {
-          name: mo.name,
-          initiative: 0,
-          hp,
-          hpMax: mo.stats.hpMax ?? hp ?? undefined,
-          ac: mo.stats.ac ?? undefined,
-          isPC: false,
-        };
-      }
+      if (mo) input = combatantFromMonster(mo);
     }
     if (input) addCombatant.mutate({ encounterId: encounter.id, input });
   };

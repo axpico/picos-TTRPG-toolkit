@@ -13,6 +13,7 @@ build/
 apps/server/data/
 *.db
 *.db-journal
+.dev-server-port
 *.db-wal
 *.db-shm
 
