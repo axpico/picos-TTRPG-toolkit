@@ -1,30 +1,7 @@
+import { useState } from "react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
-import type { MapGrid, PublicLocation } from "@toolkit/shared";
-import { TokenView } from "../modules/map/TokenView.js";
-
-/** Normalized grid overlay (viewBox 0..1) drawn over the player's map. */
-function PlayerGrid({ grid }: { grid: MapGrid }) {
-  if (!grid.visible || grid.size <= 0) return null;
-  const xs: number[] = [];
-  const ys: number[] = [];
-  for (let x = grid.offsetX; x <= 1; x += grid.size) xs.push(x);
-  for (let y = grid.offsetY; y <= 1; y += grid.size) ys.push(y);
-  return (
-    <svg
-      className="pointer-events-none absolute inset-0 h-full w-full"
-      viewBox="0 0 1 1"
-      preserveAspectRatio="none"
-      aria-hidden
-    >
-      {xs.map((x) => (
-        <line key={`x${x}`} x1={x} y1={0} x2={x} y2={1} stroke={grid.color} strokeWidth={0.002} />
-      ))}
-      {ys.map((y) => (
-        <line key={`y${y}`} x1={0} y1={y} x2={1} y2={y} stroke={grid.color} strokeWidth={0.002} />
-      ))}
-    </svg>
-  );
-}
+import type { PublicLocation } from "@toolkit/shared";
+import { TokenView, GridOverlay } from "../modules/map/TokenView.js";
 
 /**
  * The broadcasted map, zoomable/pannable for players. Pins are pre-filtered
@@ -34,6 +11,7 @@ function PlayerGrid({ grid }: { grid: MapGrid }) {
  */
 export function MapStage({ map }: { map: PublicLocation }) {
   const hasReveals = map.reveals.some((r) => r.mode === "reveal");
+  const [aspect, setAspect] = useState(1);
 
   return (
     <section className="card overflow-hidden">
@@ -59,7 +37,16 @@ export function MapStage({ map }: { map: PublicLocation }) {
               contentStyle={{ display: "flex" }}
             >
               <div className="relative inline-block">
-                <img src={map.imageUrl} alt={map.name} draggable={false} className="block max-w-none" />
+                <img
+                  src={map.imageUrl}
+                  alt={map.name}
+                  draggable={false}
+                  className="block max-w-none"
+                  onLoad={(e) => {
+                    const img = e.currentTarget;
+                    if (img.naturalHeight > 0) setAspect(img.naturalWidth / img.naturalHeight);
+                  }}
+                />
                 {hasReveals && (
                   <svg
                     className="pointer-events-none absolute inset-0 h-full w-full"
@@ -102,7 +89,7 @@ export function MapStage({ map }: { map: PublicLocation }) {
                   </div>
                 ))}
                 {/* Grid overlay (drawn above the image, below tokens). */}
-                {map.grid && <PlayerGrid grid={map.grid} />}
+                {map.grid && <GridOverlay grid={map.grid} aspect={aspect} />}
                 {/* Tokens — already fog/visibility-filtered server-side. */}
                 {map.tokens.map((t) => (
                   <TokenView key={t.id} token={t} />

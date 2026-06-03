@@ -209,6 +209,18 @@ describe("snapToGrid", () => {
     expect(snapToGrid({ x: 0.123, y: 0.456 }, null)).toEqual({ x: 0.123, y: 0.456 });
     expect(snapToGrid({ x: 0.123, y: 0.456 }, grid({ enabled: false }))).toEqual({ x: 0.123, y: 0.456 });
   });
+
+  it("keeps cells square on a non-square map via aspect", () => {
+    // 2:1 map (aspect=2): a size-0.1 (width) cell spans 0.2 in height space, so
+    // the y axis snaps on a 0.2 step while x still snaps on 0.1.
+    const r = snapToGrid({ x: 0.12, y: 0.25 }, grid(), 2);
+    expect(r.x).toBeCloseTo(0.15); // cell [0.1,0.2] → center 0.15
+    expect(r.y).toBeCloseTo(0.3); // cell [0.2,0.4] → center 0.3
+  });
+
+  it("matches the unitary case when aspect is 1", () => {
+    expect(snapToGrid({ x: 0.12, y: 0.27 }, grid(), 1)).toEqual(snapToGrid({ x: 0.12, y: 0.27 }, grid()));
+  });
 });
 
 describe("presetTokenSize", () => {

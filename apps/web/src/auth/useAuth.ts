@@ -14,7 +14,12 @@ export function useLogin() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: LoginInput) => api.post<AuthMe>("/api/auth/login", input),
-    onSuccess: () => qc.invalidateQueries(),
+    onSuccess: (data) => {
+      // Seed the auth cache synchronously so the route Gate sees the session
+      // immediately on navigate (otherwise it bounces back to /login).
+      qc.setQueryData(["auth", "me"], data);
+      qc.invalidateQueries();
+    },
   });
 }
 
@@ -22,7 +27,10 @@ export function useRegister() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: RegisterInput) => api.post<AuthMe>("/api/auth/register", input),
-    onSuccess: () => qc.invalidateQueries(),
+    onSuccess: (data) => {
+      qc.setQueryData(["auth", "me"], data);
+      qc.invalidateQueries();
+    },
   });
 }
 

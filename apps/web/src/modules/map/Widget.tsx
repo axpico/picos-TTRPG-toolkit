@@ -282,6 +282,9 @@ function MapEditor({ campaignId, location, tool, setTool, onChange, onUpload, up
 
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
   const [panelTab, setPanelTab] = useState<PanelTab>("tokens");
+  // Grid calibration: click two adjacent intersections to derive cell size/offset.
+  const [calibrating, setCalibrating] = useState(false);
+  const calibPoint = useRef<Point | null>(null);
 
   // Activating a tool focuses the matching panel tab so its editor is in view.
   const selectTool = (next: Tool) => {
@@ -296,6 +299,13 @@ function MapEditor({ campaignId, location, tool, setTool, onChange, onUpload, up
   const reveals = work?.reveals ?? location.reveals;
   const tokens = work?.tokens ?? location.tokens;
   const grid = location.grid;
+
+  // Image aspect (width/height) — keeps grid cells square and snapping correct.
+  const gridAspect = () => {
+    const n = naturalRef.current;
+    return n && n.h > 0 ? n.w / n.h : 1;
+  };
+  const aspect = natural && natural.h > 0 ? natural.w / natural.h : 1;
 
   const normFromEvent = (clientX: number, clientY: number): Point | null => {
     const el = contentRef.current;
@@ -409,7 +419,7 @@ function MapEditor({ campaignId, location, tool, setTool, onChange, onUpload, up
         });
       } else if (it.kind === "moveToken") {
         if (!it.moved && isDrag(it.startClient, { x: e.clientX, y: e.clientY })) it.moved = true;
-        const snapped = snapToGrid(p, locationRef.current.grid);
+        const snapped = snapToGrid(p, locationRef.current.grid, gridAspect());
         setWork({
           ...seedBase(),
           tokens: seedTokens().map((t) =>
@@ -526,6 +536,7 @@ function MapEditor({ campaignId, location, tool, setTool, onChange, onUpload, up
 
   // Pointer-down on empty map: draw a reveal (reveal tool) or pan (no tool).
   const onContentPointerDown = (e: React.PointerEvent) => {
+    if (calibrating) return; // clicks drive calibration; don't pan
     const t = toolRef.current;
     if (t === "reveal") {
       const p = normFromEvent(e.clientX, e.clientY);
@@ -550,6 +561,29 @@ function MapEditor({ campaignId, location, tool, setTool, onChange, onUpload, up
   const onContentClick = (e: React.MouseEvent) => {
     const p = normFromEvent(e.clientX, e.clientY);
     if (!p) return;
+    if (calibrating) {
+      if (!calibPoint.current) {
+        calibPoint.current = p; // first intersection
+        return;
+      }
+      const p1 = calibPoint.current;
+      const a = gridAspect();
+      // Cell size in width-fraction units; one axis is ~0 for an adjacent click.
+      const size = Math.max(Math.abs(p.x - p1.x), Math.abs(p.y - p1.y) / a);
+      if (size > 0.002) {
+        const mod = (v: number) => ((v % size) + size) % size;
+        updateGrid({
+          size: Math.min(1, size),
+          offsetX: mod(p1.x),
+          offsetY: mod(p1.y / a),
+          enabled: true,
+          visible: true,
+        });
+      }
+      calibPoint.current = null;
+      setCalibrating(false);
+      return;
+    }
     if (tool === "pin") {
       onChange({
         pins: [
@@ -558,7 +592,7 @@ function MapEditor({ campaignId, location, tool, setTool, onChange, onUpload, up
         ],
       });
     } else if (tool === "token") {
-      const at = snapToGrid(p, location.grid);
+      const at = snapToGrid(p, location.grid, gridAspect());
       addToken({ x: at.x, y: at.y });
     }
   };
@@ -704,7 +738,7 @@ function MapEditor({ campaignId, location, tool, setTool, onChange, onUpload, up
                 ref={viewportRef}
                 className={clsx(
                   "absolute inset-0 overflow-auto",
-                  tool ? "cursor-crosshair" : busy ? "cursor-grabbing" : "cursor-grab",
+                  tool || calibrating ? "cursor-crosshair" : busy ? "cursor-grabbing" : "cursor-grab",
                 )}
               >
                 <div
@@ -727,9 +761,7 @@ function MapEditor({ campaignId, location, tool, setTool, onChange, onUpload, up
                     }
                   />
                   {/* Grid overlay */}
-                  {grid && natural && (
-                    <GridOverlay grid={grid} viewW={natural.w * scale} viewH={natural.h * scale} />
-                  )}
+                  {grid && natural && <GridOverlay grid={grid} aspect={aspect} />}
                   {/* Reveals — interactive on the GM canvas (move + resize). */}
                   {reveals.map((r) => (
                     <RevealRect
@@ -865,14 +897,23 @@ function MapEditor({ campaignId, location, tool, setTool, onChange, onUpload, up
                   ⤢
                 </button>
               </div>
-              <div className="pointer-events-none absolute left-2 top-2 z-10 rounded bg-ink-900/70 px-1.5 py-0.5 text-[10px] text-ink-400">
-                {tool === "pin"
-                  ? "Click to drop a pin"
-                  : tool === "reveal"
-                    ? "Drag to draw a reveal"
-                    : tool === "token"
-                      ? "Click to drop a token"
-                      : "Scroll to zoom · drag to pan · drag tokens to move"}
+              <div
+                className={clsx(
+                  "pointer-events-none absolute left-2 top-2 z-10 rounded px-1.5 py-0.5 text-[10px]",
+                  calibrating ? "bg-accent-600 text-white" : "bg-ink-900/70 text-ink-400",
+                )}
+              >
+                {calibrating
+                  ? calibPoint.current
+                    ? "Now click the next grid line / intersection"
+                    : "Click one grid intersection, then the adjacent one"
+                  : tool === "pin"
+                    ? "Click to drop a pin"
+                    : tool === "reveal"
+                      ? "Drag to draw a reveal"
+                      : tool === "token"
+                        ? "Click to drop a token"
+                        : "Scroll to zoom · drag to pan · drag tokens to move"}
               </div>
             </>
           ) : (
@@ -1001,6 +1042,11 @@ function MapEditor({ campaignId, location, tool, setTool, onChange, onUpload, up
                   grid={location.grid}
                   updateGrid={updateGrid}
                   onDetect={runDetectGrid}
+                  onCalibrate={() => {
+                    calibPoint.current = null;
+                    setCalibrating(true);
+                  }}
+                  calibrating={calibrating}
                   hasImage={Boolean(location.imageUrl)}
                 />
               )}
@@ -1378,27 +1424,47 @@ function GridPanel({
   grid,
   updateGrid,
   onDetect,
+  onCalibrate,
+  calibrating,
   hasImage,
 }: {
   grid: MapGrid | null;
   updateGrid: (patch: Partial<MapGrid>) => void;
   onDetect: () => void;
+  onCalibrate: () => void;
+  calibrating: boolean;
   hasImage: boolean;
 }) {
+  const size = grid?.size ?? 0.05;
+  const columns = Math.max(1, Math.round(1 / size));
+
   return (
-    <section>
-      <button
-        className="btn-primary mb-2 w-full px-2 py-1.5 text-xs"
-        onClick={onDetect}
-        disabled={!hasImage}
-        title="Best-effort auto-detect from the map image"
-      >
-        ⌖ Auto-detect grid
-      </button>
-      <p className="mb-2 text-[10px] leading-relaxed text-ink-500">
-        Auto-detect is best-effort — fine-tune the cell size and offsets below if it's off.
+    <section className="space-y-3">
+      {/* Set-up actions */}
+      <div className="grid grid-cols-2 gap-1.5">
+        <button
+          className={clsx("btn-ghost px-2 py-1.5 text-xs", calibrating && "bg-accent-600 text-white")}
+          onClick={onCalibrate}
+          disabled={!hasImage}
+          title="Click two adjacent grid lines on the map to set the grid"
+        >
+          {calibrating ? "Click the map…" : "⊹ Calibrate"}
+        </button>
+        <button
+          className="btn-ghost px-2 py-1.5 text-xs"
+          onClick={onDetect}
+          disabled={!hasImage}
+          title="Best-effort auto-detect from the map image"
+        >
+          ⌖ Auto-detect
+        </button>
+      </div>
+      <p className="text-[10px] leading-relaxed text-ink-500">
+        <b>Calibrate</b> is the reliable way: click two adjacent grid intersections on the map.
+        Or set how many squares span the map's width below.
       </p>
 
+      {/* Toggles + color */}
       <div className="flex items-center gap-3 text-ink-300">
         <label className="flex items-center gap-1.5">
           <input type="checkbox" checked={grid?.enabled ?? false} onChange={(e) => updateGrid({ enabled: e.target.checked })} />
@@ -1417,40 +1483,52 @@ function GridPanel({
         />
       </div>
 
-      <label className="mt-1 flex items-center gap-2 text-ink-400">
-        <span className="w-10">Cell</span>
+      {/* Squares across */}
+      <label className="flex items-center gap-2 text-ink-400">
+        <span className="shrink-0">Squares across</span>
+        <input
+          type="number"
+          min={1}
+          max={200}
+          className="input w-20"
+          value={columns}
+          onChange={(e) => {
+            const n = Math.round(Number(e.target.value));
+            if (n >= 1) updateGrid({ size: 1 / n });
+          }}
+        />
         <input
           type="range"
-          min={0.01}
-          max={0.25}
-          step={0.001}
-          value={grid?.size ?? 0.05}
-          onChange={(e) => updateGrid({ size: Number(e.target.value) })}
+          min={2}
+          max={60}
+          step={1}
+          value={Math.min(60, columns)}
+          onChange={(e) => updateGrid({ size: 1 / Number(e.target.value) })}
           className="flex-1"
         />
-        <span className="w-10 text-right font-mono">{((grid?.size ?? 0.05) * 100).toFixed(1)}%</span>
       </label>
 
-      <div className="mt-1 grid grid-cols-2 gap-1">
+      {/* Offsets */}
+      <div className="grid grid-cols-2 gap-2">
         <label className="flex items-center gap-1 text-ink-400">
-          <span>X</span>
+          <span>Offset X</span>
           <input
             type="range"
             min={0}
-            max={grid?.size ?? 0.05}
-            step={0.001}
+            max={size}
+            step={size / 50}
             value={grid?.offsetX ?? 0}
             onChange={(e) => updateGrid({ offsetX: Number(e.target.value) })}
             className="flex-1"
           />
         </label>
         <label className="flex items-center gap-1 text-ink-400">
-          <span>Y</span>
+          <span>Offset Y</span>
           <input
             type="range"
             min={0}
-            max={grid?.size ?? 0.05}
-            step={0.001}
+            max={size}
+            step={size / 50}
             value={grid?.offsetY ?? 0}
             onChange={(e) => updateGrid({ offsetY: Number(e.target.value) })}
             className="flex-1"

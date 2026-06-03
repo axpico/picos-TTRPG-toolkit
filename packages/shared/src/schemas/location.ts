@@ -163,15 +163,24 @@ export function isPointRevealed(
   return !hidden;
 }
 
-/** Snap a normalized point to the nearest grid cell center (identity if disabled). */
-export function snapToGrid(p: { x: number; y: number }, grid: MapGrid | null): { x: number; y: number } {
+/**
+ * Snap a normalized point to the nearest grid cell center (identity if disabled).
+ * `grid.size`/offsets are fractions of image width; `aspect = width/height`
+ * converts the y axis so cells stay square on non-square maps.
+ */
+export function snapToGrid(
+  p: { x: number; y: number },
+  grid: MapGrid | null,
+  aspect = 1,
+): { x: number; y: number } {
   if (!grid || !grid.enabled || grid.size <= 0) return { x: p.x, y: p.y };
-  const snap = (v: number, off: number) => {
-    const cell = Math.floor((v - off) / grid.size);
-    return off + (cell + 0.5) * grid.size;
-  };
   const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
-  return { x: clamp01(snap(p.x, grid.offsetX)), y: clamp01(snap(p.y, grid.offsetY)) };
+  const snap = (v: number, off: number) => off + (Math.floor((v - off) / grid.size) + 0.5) * grid.size;
+  const x = snap(p.x, grid.offsetX);
+  // Work in width-equivalent units on y (divide by aspect), snap, convert back.
+  const a = aspect > 0 ? aspect : 1;
+  const y = snap(p.y / a, grid.offsetY) * a;
+  return { x: clamp01(x), y: clamp01(y) };
 }
 
 export type TokenSizePreset = "S" | "M" | "L" | "Huge";

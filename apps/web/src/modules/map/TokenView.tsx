@@ -71,28 +71,36 @@ export function TokenView({
 }
 
 /**
- * A repeating square grid overlay drawn with an SVG pattern, in normalized space
- * (cell size/offset as fractions). `viewW`/`viewH` are the rendered pixel size of
- * the map so the pattern can be expressed in those units.
+ * A square grid overlay drawn in normalized image space (viewBox 0..1, stretched
+ * to the map with `preserveAspectRatio="none"`), so it scales 1:1 with the image
+ * at any zoom — exactly like the fog mask. `aspect = imageWidth/imageHeight`
+ * keeps cells pixel-square on non-square maps; lines use a non-scaling stroke so
+ * they stay crisp at any zoom.
  */
-export function GridOverlay({ grid, viewW, viewH }: { grid: MapGrid; viewW: number; viewH: number }) {
-  if (!grid.visible || grid.size <= 0 || viewW <= 0 || viewH <= 0) return null;
-  const cell = grid.size * viewW;
-  const ox = grid.offsetX * viewW;
-  const oy = grid.offsetY * viewW;
+export function GridOverlay({ grid, aspect }: { grid: MapGrid; aspect: number }) {
+  if (!grid.visible || grid.size <= 0) return null;
+  const a = aspect > 0 ? aspect : 1;
+  const size = grid.size; // cell width as a fraction of width
+  const ySize = size * a; // same pixel size expressed as a fraction of height
+
+  const xs: number[] = [];
+  for (let x = grid.offsetX % size; x <= 1.0001; x += size) xs.push(x);
+  const ys: number[] = [];
+  for (let y = (grid.offsetY % size) * a; y <= 1.0001; y += ySize) ys.push(y);
+
   return (
     <svg
-      className="pointer-events-none absolute inset-0 z-[1]"
-      width={viewW}
-      height={viewH}
+      className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
+      viewBox="0 0 1 1"
+      preserveAspectRatio="none"
       aria-hidden
     >
-      <defs>
-        <pattern id="map-grid" width={cell} height={cell} patternUnits="userSpaceOnUse" x={ox} y={oy}>
-          <path d={`M ${cell} 0 L 0 0 0 ${cell}`} fill="none" stroke={grid.color} strokeWidth={1} />
-        </pattern>
-      </defs>
-      <rect width={viewW} height={viewH} fill="url(#map-grid)" />
+      {xs.map((x) => (
+        <line key={`x${x}`} x1={x} y1={0} x2={x} y2={1} stroke={grid.color} strokeWidth={1} vectorEffect="non-scaling-stroke" />
+      ))}
+      {ys.map((y) => (
+        <line key={`y${y}`} x1={0} y1={y} x2={1} y2={y} stroke={grid.color} strokeWidth={1} vectorEffect="non-scaling-stroke" />
+      ))}
     </svg>
   );
 }
