@@ -61,6 +61,7 @@ model Campaign {
   diceRolls    DiceRoll[]
   broadcasts   Broadcast[]
   clocks       ProgressClock[]
+  timers       Timer[]
   rollTables   RollTable[]
 }
 
@@ -287,6 +288,23 @@ model ProgressClock {
   order       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([campaignId, order])
+}
+
+model Timer {
+  id               String    @id @default(cuid())
+  campaignId       String
+  campaign         Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name             String
+  durationSeconds  Int       @default(300)
+  endsAt           DateTime?
+  remainingSeconds Int       @default(300)
+  color            String    @default("#ef4444")
+  secret           Boolean   @default(false)
+  order            Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([campaignId, order])
 }

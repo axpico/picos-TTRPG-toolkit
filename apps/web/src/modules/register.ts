@@ -11,5 +11,6 @@ import "./log/Widget.js";
 import "./dice/Widget.js";
 import "./map/Widget.js";
 import "./clocks/Widget.js";
+import "./timers/Widget.js";
 import "./rolltables/Widget.js";
 import "./sticky/Widget.js";

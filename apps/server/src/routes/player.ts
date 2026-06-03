@@ -14,6 +14,7 @@ import { toCalendarDto } from "../lib/repos/calendar.js";
 import { toBroadcastDto } from "../lib/repos/broadcast.js";
 import { toPublicLocation } from "../lib/repos/location.js";
 import { toClockDto } from "../lib/repos/clock.js";
+import { toTimerDto } from "../lib/repos/timer.js";
 import { toDiceDto } from "../lib/repos/dice.js";
 import { canManageCharacter } from "../lib/auth.js";
 import { openSse } from "../plugins/sse.js";
@@ -58,7 +59,7 @@ export const playerRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
-    const [party, activeEncounter, weatherRow, calendarRow, mapRow, clockRows, diceRows] =
+    const [party, activeEncounter, weatherRow, calendarRow, mapRow, clockRows, timerRows, diceRows] =
       await Promise.all([
         prisma.partyMember.findMany({
           where: { campaignId },
@@ -74,6 +75,12 @@ export const playerRoutes: FastifyPluginAsync = async (app) => {
         mapLocationId ? prisma.location.findUnique({ where: { id: mapLocationId } }) : Promise.resolve(null),
         active.has("clocks")
           ? prisma.progressClock.findMany({
+              where: { campaignId, secret: false },
+              orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+            })
+          : Promise.resolve([]),
+        active.has("timers")
+          ? prisma.timer.findMany({
               where: { campaignId, secret: false },
               orderBy: [{ order: "asc" }, { createdAt: "asc" }],
             })
@@ -102,6 +109,7 @@ export const playerRoutes: FastifyPluginAsync = async (app) => {
             : null,
         rolltable: active.has("rolltable:current") ? tableResult : null,
         clocks: active.has("clocks") ? clockRows.map(toClockDto) : null,
+        timers: active.has("timers") ? timerRows.map(toTimerDto) : null,
         dice: active.has("dice") ? diceRows.map((r) => toDiceDto(r, r.user)) : null,
       },
     };

@@ -20,4 +20,5 @@ export * from "./dice.js";
 export * from "./statblock.js";
 export * from "./location.js";
 export * from "./clock.js";
+export * from "./timer.js";
 export * from "./rolltable.js";

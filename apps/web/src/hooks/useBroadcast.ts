@@ -64,6 +64,10 @@ export function useBroadcast({ url, campaignId, onEvent, onStatus }: Options) {
         qc.invalidateQueries({ queryKey: ["clocks", campaignId] });
         qc.invalidateQueries({ queryKey: ["player", campaignId] });
       }
+      if (event.type.startsWith("timer.")) {
+        qc.invalidateQueries({ queryKey: ["timers", campaignId] });
+        qc.invalidateQueries({ queryKey: ["player", campaignId] });
+      }
       if (event.type === "broadcast.change") {
         qc.invalidateQueries({ queryKey: ["broadcasts", campaignId] });
         qc.invalidateQueries({ queryKey: ["player", campaignId] });
@@ -111,6 +115,9 @@ export function useBroadcast({ url, campaignId, onEvent, onStatus }: Options) {
       "clock.create",
       "clock.update",
       "clock.delete",
+      "timer.create",
+      "timer.update",
+      "timer.delete",
     ];
     for (const t of eventTypes) source.addEventListener(t, onCustom as EventListener);
 

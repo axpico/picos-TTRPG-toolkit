@@ -8,6 +8,7 @@ import type {
   ProgressClock,
   PublicLocation,
   RollTableResult,
+  Timer,
   UpdateMyCharacterInput,
   Weather,
 } from "@toolkit/shared";
@@ -24,6 +25,7 @@ export interface PlayerState {
     map: PublicLocation | null;
     rolltable: RollTableResult | null;
     clocks: ProgressClock[] | null;
+    timers: Timer[] | null;
     dice: DiceRoll[] | null;
   };
 }

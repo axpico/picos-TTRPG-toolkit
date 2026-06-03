@@ -23,6 +23,7 @@ import { fileReadRoutes, fileUploadRoutes } from "./routes/files.js";
 import { adminRoutes } from "./routes/admin.js";
 import { locationRoutes } from "./routes/location.js";
 import { clockRoutes } from "./routes/clock.js";
+import { timerRoutes } from "./routes/timer.js";
 import { rollTableRoutes } from "./routes/rolltable.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -70,6 +71,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       await dm.register(logRoutes, { prefix: "/api/campaigns" });
       await dm.register(locationRoutes, { prefix: "/api/campaigns" });
       await dm.register(clockRoutes, { prefix: "/api/campaigns" });
+      await dm.register(timerRoutes, { prefix: "/api/campaigns" });
       await dm.register(rollTableRoutes, { prefix: "/api/campaigns" });
     });
 

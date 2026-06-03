@@ -13,6 +13,8 @@ import { usePlayerState } from "./usePlayer.js";
 import { PlayerDock } from "./PlayerDock.js";
 import { MapStage } from "./MapStage.js";
 import { formatClock, formatDayPhase, formatGameDate } from "./format.js";
+import { formatDuration, remainingSeconds } from "../modules/timers/util.js";
+import type { Timer } from "@toolkit/shared";
 
 const STATUS_LABEL: Record<PartyMemberStatus, string> = {
   active: "Active",
@@ -125,7 +127,7 @@ function StageContent({
   s: NonNullable<ReturnType<typeof usePlayerState>["data"]>;
   myId: string | undefined;
 }) {
-  const { calendar, weather, rolltable, map, combat, party, clocks, dice } = s.data;
+  const { calendar, weather, rolltable, map, combat, party, clocks, timers, dice } = s.data;
   const anyActive = s.broadcasts.some((b) => b.active);
 
   if (!anyActive) {
@@ -284,6 +286,8 @@ function StageContent({
         </section>
       )}
 
+      {timers && timers.length > 0 && <PlayerTimers timers={timers} />}
+
       {dice && dice.length > 0 && (
         <section className="card p-4">
           <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-300">Recent rolls</h2>
@@ -304,5 +308,49 @@ function StageContent({
         </section>
       )}
     </>
+  );
+}
+
+function PlayerTimers({ timers }: { timers: Timer[] }) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 500);
+    return () => clearInterval(t);
+  }, []);
+
+  return (
+    <section className="card p-4">
+      <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-300">Timers</h2>
+      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {timers.map((timer) => {
+          const remaining = remainingSeconds(timer, nowMs);
+          const running = timer.endsAt != null;
+          const done = running && remaining === 0;
+          const urgent = running && !done && remaining <= 10;
+          return (
+            <li
+              key={timer.id}
+              className={clsx(
+                "flex items-center justify-between gap-3 rounded-md border px-3 py-2",
+                done || urgent
+                  ? "animate-pulse border-red-500/60 bg-red-900/15"
+                  : "border-ink-700 bg-ink-900",
+              )}
+            >
+              <span className="min-w-0 truncate font-medium">{timer.name}</span>
+              <span
+                className={clsx(
+                  "shrink-0 font-mono text-xl font-bold tabular-nums",
+                  done || urgent ? "text-red-300" : "text-ink-100",
+                )}
+                style={!done && !urgent ? { color: timer.color } : undefined}
+              >
+                {formatDuration(remaining)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

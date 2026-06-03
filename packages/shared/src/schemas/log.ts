@@ -38,6 +38,8 @@ export const logEntryKind = z.enum([
   "table.roll",
   "clock.create",
   "clock.delete",
+  "timer.create",
+  "timer.delete",
   "note",
   "broadcast.change",
   "other",
