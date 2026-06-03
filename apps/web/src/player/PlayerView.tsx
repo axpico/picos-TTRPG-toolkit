@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import type { PartyMemberStatus } from "@toolkit/shared";
+import { weatherIcon, type PartyMemberStatus } from "@toolkit/shared";
 import clsx from "clsx";
 import { useBroadcast, type ConnectionStatus } from "../hooks/useBroadcast.js";
 import { useLogout, useMe } from "../auth/useAuth.js";
@@ -153,6 +153,7 @@ function StageContent({
           {weather && (
             <div className="flex items-baseline gap-2">
               <span className="text-xs uppercase tracking-wide text-ink-500">Weather</span>
+              <span>{weatherIcon(weather.current.condition)}</span>
               <span className="font-medium">{weather.current.condition}</span>
               <span className="text-ink-300">{weather.current.temperature}</span>
               {weather.current.description && (

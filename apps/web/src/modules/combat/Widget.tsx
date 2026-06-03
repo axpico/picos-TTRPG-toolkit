@@ -3,6 +3,9 @@ import clsx from "clsx";
 import type { Combatant, Encounter } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { HpBar, InlineConfirm } from "../shared.js";
+import { useParty } from "../party/api.js";
+import { useNpcs } from "../npc/api.js";
+import { useMonsters } from "../bestiary/api.js";
 import {
   useAddCombatant,
   useCreateEncounter,
@@ -101,7 +104,67 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
   const addCombatant = useAddCombatant(campaignId);
   const updateCombatant = useUpdateCombatant(campaignId);
   const removeCombatant = useRemoveCombatant(campaignId);
+  const party = useParty(campaignId);
+  const npcs = useNpcs({ campaignId });
+  const monsters = useMonsters({ campaignId });
   const [draft, setDraft] = useState({ name: "", initiative: "", isPC: false });
+  const [pickSource, setPickSource] = useState<"" | "party" | "npc" | "bestiary">("");
+
+  const pickOptions =
+    pickSource === "party"
+      ? (party.data ?? []).map((m) => ({ id: m.id, label: m.name }))
+      : pickSource === "npc"
+        ? (npcs.data ?? []).map((n) => ({ id: n.id, label: n.name }))
+        : pickSource === "bestiary"
+          ? (monsters.data ?? []).map((mo) => ({ id: mo.id, label: mo.name }))
+          : [];
+
+  // Pull a combatant straight out of the party / NPC / bestiary libraries,
+  // carrying over HP / max HP / AC (and PC flag for party members).
+  const addFromSource = (id: string) => {
+    if (!id) return;
+    let input: Parameters<typeof addCombatant.mutate>[0]["input"] | null = null;
+    if (pickSource === "party") {
+      const m = party.data?.find((x) => x.id === id);
+      if (m) {
+        input = {
+          name: m.name,
+          initiative: 0,
+          hp: m.hp,
+          hpMax: m.hpMax,
+          ac: m.stats.ac ?? undefined,
+          isPC: true,
+        };
+      }
+    } else if (pickSource === "npc") {
+      const n = npcs.data?.find((x) => x.id === id);
+      if (n) {
+        const hp = n.stats.hp ?? n.stats.hpMax ?? undefined;
+        input = {
+          name: n.name,
+          initiative: 0,
+          hp,
+          hpMax: n.stats.hpMax ?? hp ?? undefined,
+          ac: n.stats.ac ?? undefined,
+          isPC: false,
+        };
+      }
+    } else if (pickSource === "bestiary") {
+      const mo = monsters.data?.find((x) => x.id === id);
+      if (mo) {
+        const hp = mo.stats.hp ?? mo.stats.hpMax ?? undefined;
+        input = {
+          name: mo.name,
+          initiative: 0,
+          hp,
+          hpMax: mo.stats.hpMax ?? hp ?? undefined,
+          ac: mo.stats.ac ?? undefined,
+          isPC: false,
+        };
+      }
+    }
+    if (input) addCombatant.mutate({ encounterId: encounter.id, input });
+  };
 
   // Re-number `order` so the list is sorted by initiative (desc), persisting
   // each changed combatant so the new ordering sticks across reloads.
@@ -219,6 +282,43 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
           </li>
         )}
       </ul>
+
+      {/* Add from party / NPC / bestiary */}
+      <div className="flex items-center gap-1 border-t border-ink-700 bg-ink-900/50 px-2 py-1.5">
+        <span className="shrink-0 text-xs text-ink-500">Add from</span>
+        <select
+          className="input w-24"
+          value={pickSource}
+          onChange={(e) => setPickSource(e.target.value as typeof pickSource)}
+        >
+          <option value="">—</option>
+          <option value="party">Party</option>
+          <option value="npc">NPC</option>
+          <option value="bestiary">Bestiary</option>
+        </select>
+        <select
+          className="input flex-1"
+          value=""
+          disabled={!pickSource || pickOptions.length === 0}
+          onChange={(e) => {
+            addFromSource(e.target.value);
+            e.currentTarget.selectedIndex = 0;
+          }}
+        >
+          <option value="">
+            {!pickSource
+              ? "Pick a source first…"
+              : pickOptions.length === 0
+                ? "Nothing in this library"
+                : "Select to add…"}
+          </option>
+          {pickOptions.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {/* Add combatant row */}
       <div className="flex items-center gap-1 border-t border-ink-700 bg-ink-900/50 px-2 py-1.5">

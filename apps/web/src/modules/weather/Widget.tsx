@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { WeatherTableEntry } from "@toolkit/shared";
+import { WEATHER_PRESETS, weatherIcon, type WeatherTableEntry } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { useRollWeather, useSetWeather, useWeather } from "./api.js";
 
@@ -7,7 +7,7 @@ function WeatherWidget({ campaignId }: WidgetContext) {
   const data = useWeather(campaignId);
   const set = useSetWeather(campaignId);
   const roll = useRollWeather(campaignId);
-  const [editing, setEditing] = useState(false);
+  const [showTable, setShowTable] = useState(false);
   const [condition, setCondition] = useState("");
   const [temperature, setTemperature] = useState("");
   const [description, setDescription] = useState("");
@@ -26,13 +26,81 @@ function WeatherWidget({ campaignId }: WidgetContext) {
     return <div className="p-3 text-sm text-ink-400">Loading…</div>;
   }
 
+  const current = data.data.current;
+
+  // Save the current weather, but only when something actually changed so a
+  // stray blur doesn't fire a needless request.
+  const saveCurrent = () => {
+    if (
+      condition === current.condition &&
+      temperature === current.temperature &&
+      description === current.description
+    ) {
+      return;
+    }
+    set.mutate({ current: { condition, temperature, description } });
+  };
+
+  const applyPreset = (p: (typeof WEATHER_PRESETS)[number]) => {
+    setCondition(p.condition);
+    setTemperature(p.temperature);
+    setDescription(p.description);
+    set.mutate({
+      current: { condition: p.condition, temperature: p.temperature, description: p.description },
+    });
+  };
+
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-ink-700 p-3">
         <div className="text-xs uppercase tracking-wide text-ink-400">Currently</div>
-        <div className="mt-1 text-lg font-semibold">{data.data.current.condition}</div>
-        <div className="text-sm text-ink-300">{data.data.current.temperature}</div>
-        <p className="mt-1 text-sm text-ink-200">{data.data.current.description}</p>
+
+        {/* Inline-editable current weather */}
+        <div className="mt-1 flex items-start gap-2">
+          <span className="mt-1 text-3xl leading-none" title={condition}>
+            {weatherIcon(condition)}
+          </span>
+          <div className="flex-1 space-y-1">
+            <input
+              className="input text-lg font-semibold"
+              placeholder="Condition"
+              value={condition}
+              onChange={(e) => setCondition(e.target.value)}
+              onBlur={saveCurrent}
+              onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+            />
+            <input
+              className="input text-sm"
+              placeholder="Temperature"
+              value={temperature}
+              onChange={(e) => setTemperature(e.target.value)}
+              onBlur={saveCurrent}
+              onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+            />
+          </div>
+        </div>
+        <textarea
+          className="input mt-1 min-h-[52px] text-sm"
+          placeholder="Description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          onBlur={saveCurrent}
+        />
+
+        {/* Quick-set presets */}
+        <div className="mt-2 flex flex-wrap gap-1">
+          {WEATHER_PRESETS.map((p) => (
+            <button
+              key={p.condition}
+              className="btn-ghost h-7 px-1.5 text-sm"
+              title={`${p.condition} — ${p.temperature}`}
+              onClick={() => applyPreset(p)}
+            >
+              {p.icon}
+            </button>
+          ))}
+        </div>
+
         <div className="mt-2 flex gap-1">
           <button
             className="btn-primary"
@@ -41,51 +109,14 @@ function WeatherWidget({ campaignId }: WidgetContext) {
           >
             Roll new weather
           </button>
-          <button className="btn-ghost" onClick={() => setEditing((v) => !v)}>
-            {editing ? "Cancel" : "Edit"}
+          <button className="btn-ghost" onClick={() => setShowTable((v) => !v)}>
+            {showTable ? "Hide roll table" : "Roll table…"}
           </button>
         </div>
       </div>
 
-      {editing && (
+      {showTable && (
         <div className="space-y-2 overflow-auto p-3 text-sm">
-          <div>
-            <label className="text-xs uppercase tracking-wide text-ink-400">Current</label>
-            <div className="mt-1 grid grid-cols-2 gap-1.5">
-              <input
-                className="input"
-                placeholder="Condition"
-                value={condition}
-                onChange={(e) => setCondition(e.target.value)}
-              />
-              <input
-                className="input"
-                placeholder="Temperature"
-                value={temperature}
-                onChange={(e) => setTemperature(e.target.value)}
-              />
-            </div>
-            <textarea
-              className="input mt-1 min-h-[60px]"
-              placeholder="Description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-            <button
-              className="btn-primary mt-1"
-              onClick={() =>
-                set.mutate(
-                  { current: { condition, temperature, description } },
-                  { onSuccess: () => setEditing(false) },
-                )
-              }
-            >
-              Save current
-            </button>
-          </div>
-
-          <hr className="my-1 border-ink-700" />
-
           <div>
             <label className="text-xs uppercase tracking-wide text-ink-400">
               Weather table (used by "Roll new weather")
@@ -157,12 +188,7 @@ function WeatherWidget({ campaignId }: WidgetContext) {
               </button>
               <button
                 className="btn-primary"
-                onClick={() =>
-                  set.mutate(
-                    { table: table.length ? table : null },
-                    { onSuccess: () => setEditing(false) },
-                  )
-                }
+                onClick={() => set.mutate({ table: table.length ? table : null })}
               >
                 Save table
               </button>
