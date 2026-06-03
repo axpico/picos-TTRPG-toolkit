@@ -60,6 +60,29 @@ export function useNextTurn(campaignId: string) {
   });
 }
 
+export function usePrevTurn(campaignId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (encounterId: string) =>
+      api.post<Encounter>(
+        `/api/campaigns/${campaignId}/encounters/${encounterId}/prev-turn`,
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(campaignId) }),
+  });
+}
+
+export function useRollInitiative(campaignId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { encounterId: string; onlyNpc?: boolean }) =>
+      api.post<Encounter>(
+        `/api/campaigns/${campaignId}/encounters/${args.encounterId}/roll-initiative`,
+        { onlyNpc: args.onlyNpc ?? false },
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(campaignId) }),
+  });
+}
+
 export function useAddCombatant(campaignId: string) {
   const qc = useQueryClient();
   return useMutation({

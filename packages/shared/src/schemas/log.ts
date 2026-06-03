@@ -18,6 +18,7 @@ export const logEntryKind = z.enum([
   "combat.combatant.add",
   "combat.combatant.update",
   "combat.combatant.remove",
+  "combat.initiative",
   "npc.create",
   "npc.update",
   "npc.delete",

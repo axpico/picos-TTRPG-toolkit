@@ -3,6 +3,10 @@ import { z } from "zod";
 export const createDiceInput = z.object({
   notation: z.string().min(1),
   label: z.string().optional(),
+  /** When true, the roll is GM-only and never reaches players. */
+  hidden: z.boolean().optional(),
+  /** Roll the leading d20 with advantage/disadvantage (keep highest/lowest of 2). */
+  advantage: z.enum(["adv", "dis"]).optional(),
 });
 
 export const diceRoll = z.object({
@@ -14,6 +18,7 @@ export const diceRoll = z.object({
   result: z.number(),
   breakdownJson: z.string(),
   label: z.string().nullable(),
+  hidden: z.boolean(),
   createdAt: z.string(),
 });
 

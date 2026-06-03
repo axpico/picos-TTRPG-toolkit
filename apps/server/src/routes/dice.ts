@@ -1,27 +1,11 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { createDiceInput } from "@toolkit/shared";
-import type { DiceRoll as DbDiceRoll } from "@prisma/client";
 import { prisma } from "../db.js";
-import { rollNotation } from "../lib/dice.js";
+import { rollWithMode } from "../lib/dice.js";
+import { toDiceDto, visibleRolls, type Roller } from "../lib/repos/dice.js";
 
 const cidParams = z.object({ id: z.string().min(1) });
-
-type Roller = { displayName: string | null; username: string } | null;
-
-function toDiceDto(r: DbDiceRoll, roller: Roller) {
-  return {
-    id: r.id,
-    campaignId: r.campaignId,
-    userId: r.userId,
-    rollerName: roller ? roller.displayName ?? roller.username : null,
-    notation: r.notation,
-    result: r.result,
-    breakdownJson: r.breakdownJson,
-    label: r.label,
-    createdAt: r.createdAt.toISOString(),
-  };
-}
 
 export const diceRoutes: FastifyPluginAsync = async (app) => {
   const member = { preHandler: app.requireCampaignRole() };
@@ -34,13 +18,17 @@ export const diceRoutes: FastifyPluginAsync = async (app) => {
       take: 200,
       include: { user: { select: { displayName: true, username: true } } },
     });
-    return rows.map((r) => toDiceDto(r, r.user));
+    const dtos = rows.map((r) => toDiceDto(r, r.user));
+    // Players must never receive the DM's hidden rolls, even via direct call.
+    return visibleRolls(dtos, req.membership?.role);
   });
 
   app.post("/:id/dice", member, async (req, reply) => {
     const { id } = cidParams.parse(req.params);
     const body = createDiceInput.parse(req.body);
-    const rolled = rollNotation(body.notation);
+    // Only the DM may roll hidden.
+    const hidden = body.hidden === true && req.membership?.role === "dm";
+    const rolled = rollWithMode(body.notation, body.advantage);
     const created = await prisma.diceRoll.create({
       data: {
         campaignId: id,
@@ -49,11 +37,18 @@ export const diceRoutes: FastifyPluginAsync = async (app) => {
         result: rolled.total,
         breakdownJson: rolled.breakdownJson,
         label: body.label ?? null,
+        hidden,
       },
     });
     const roller: Roller = { displayName: req.user!.displayName, username: req.user!.username };
     const dto = toDiceDto(created, roller);
-    app.bus.emit(id, { type: "dice.roll", campaignId: id, payload: { roll: dto } });
+    // Hidden rolls carry no broadcastKey, so the player stream filter drops them.
+    app.bus.emit(id, {
+      type: "dice.roll",
+      campaignId: id,
+      ...(hidden ? {} : { broadcastKey: "dice" }),
+      payload: { roll: dto },
+    });
     reply.code(201);
     return dto;
   });

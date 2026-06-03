@@ -4,6 +4,7 @@ import {
   addCondition,
   applyHpDelta,
   formatClock,
+  formatDayPhase,
   formatGameDate,
   removeCondition,
 } from "../../src/player/format.js";
@@ -54,8 +55,14 @@ describe("formatClock / formatGameDate", () => {
   it("pads the clock", () => {
     expect(formatClock(cal)).toBe("09:07");
   });
-  it("names the month, falling back when out of range", () => {
-    expect(formatGameDate(cal)).toBe("5 Beta 1247");
-    expect(formatGameDate({ ...cal, currentMonth: 9 })).toBe("5 Month 9 1247");
+  it("prefixes the weekday and names the month, falling back when out of range", () => {
+    expect(formatGameDate(cal)).toBe("A, 5 Beta 1247");
+    expect(formatGameDate({ ...cal, currentMonth: 9 })).toBe("A, 5 Month 9 1247");
+  });
+  it("labels the time of day by fraction of the day", () => {
+    expect(formatDayPhase(cal)).toBe("Morning"); // hour 9 of 24
+    expect(formatDayPhase({ ...cal, currentHour: 0 })).toBe("Night");
+    expect(formatDayPhase({ ...cal, currentHour: 14 })).toBe("Afternoon");
+    expect(formatDayPhase({ ...cal, currentHour: 20 })).toBe("Evening");
   });
 });

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Combatant as DbCombatant, Encounter as DbEncounter } from "@prisma/client";
-import { toCombatantDto, toEncounterDto } from "../../../src/lib/repos/combat.js";
+import { clampTurn, toCombatantDto, toEncounterDto } from "../../../src/lib/repos/combat.js";
 
 const combatant = (over: Partial<DbCombatant>): DbCombatant => ({
   id: "cmb",
@@ -10,6 +10,8 @@ const combatant = (over: Partial<DbCombatant>): DbCombatant => ({
   initiative: 10,
   hp: 7,
   hpMax: 7,
+  ac: null,
+  defeated: false,
   conditionsJson: "[]",
   notes: null,
   isPC: false,
@@ -48,6 +50,23 @@ test("toEncounterDto sorts by order, then initiative descending", () => {
     dto.combatants.map((c) => c.name),
     ["C", "B", "A"],
   );
+});
+
+test("toCombatantDto carries ac and defeated through", () => {
+  const dto = toCombatantDto(combatant({ ac: 15, defeated: true }));
+  assert.equal(dto.ac, 15);
+  assert.equal(dto.defeated, true);
+});
+
+test("clampTurn keeps the turn marker within the combatant list", () => {
+  // Marker past the end (e.g. last combatant removed) snaps to the new last index.
+  assert.equal(clampTurn(3, 3), 2);
+  assert.equal(clampTurn(5, 2), 1);
+  // In-range and lower-bound values are preserved/floored.
+  assert.equal(clampTurn(1, 3), 1);
+  assert.equal(clampTurn(-1, 3), 0);
+  // Empty list collapses to 0.
+  assert.equal(clampTurn(2, 0), 0);
 });
 
 test("toEncounterDto serializes dates to ISO strings", () => {

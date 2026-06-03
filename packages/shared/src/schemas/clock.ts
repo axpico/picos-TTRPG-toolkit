@@ -8,6 +8,7 @@ export const progressClock = z.object({
   filled: z.number().int(),
   description: z.string().nullable(),
   color: z.string(),
+  secret: z.boolean(),
   order: z.number().int(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -20,6 +21,7 @@ export const createClockInput = z.object({
   filled: z.number().int().min(0).default(0),
   description: z.string().max(500).optional(),
   color: z.string().max(20).optional(),
+  secret: z.boolean().optional(),
 });
 // Use the input type so zod-defaulted fields (segments, filled) stay optional
 // for callers — the schema fills them in at parse time on the server.
@@ -31,5 +33,7 @@ export const updateClockInput = z.object({
   filled: z.number().int().min(0).optional(),
   description: z.string().max(500).nullable().optional(),
   color: z.string().max(20).optional(),
+  secret: z.boolean().optional(),
+  order: z.number().int().min(0).optional(),
 });
 export type UpdateClockInput = z.infer<typeof updateClockInput>;

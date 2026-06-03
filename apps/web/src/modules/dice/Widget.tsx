@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import clsx from "clsx";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
+import { useMe, roleIn } from "../../auth/useAuth.js";
 import { useDiceHistory, useRollDice } from "./api.js";
 import { fmtTime, parseBreakdown } from "./format.js";
 
@@ -9,13 +10,21 @@ const QUICK_DICE = ["d4", "d6", "d8", "d10", "d12", "d20", "d100"] as const;
 function DiceWidget({ campaignId }: WidgetContext) {
   const [notation, setNotation] = useState("1d20");
   const [label, setLabel] = useState("");
+  const [hidden, setHidden] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const history = useDiceHistory(campaignId);
   const roll = useRollDice(campaignId);
+  const me = useMe();
+  const isDM = roleIn(me.data?.memberships, campaignId) === "dm";
 
-  const doRoll = () => {
+  const doRoll = (advantage?: "adv" | "dis") => {
     if (!notation.trim()) return;
-    roll.mutate({ notation: notation.trim(), label: label.trim() || undefined });
+    roll.mutate({
+      notation: notation.trim(),
+      label: label.trim() || undefined,
+      hidden: isDM && hidden ? true : undefined,
+      advantage,
+    });
   };
 
   const appendNotation = (die: string) => {
@@ -32,7 +41,7 @@ function DiceWidget({ campaignId }: WidgetContext) {
   return (
     <div className="flex h-full flex-col">
       {/* Quick dice buttons */}
-      <div className="flex flex-wrap gap-1 border-b border-ink-700 px-2 py-1.5">
+      <div className="flex flex-wrap items-center gap-1 border-b border-ink-700 px-2 py-1.5">
         {QUICK_DICE.map((d) => (
           <button
             key={d}
@@ -56,7 +65,7 @@ function DiceWidget({ campaignId }: WidgetContext) {
       <div className="flex items-center gap-1 border-b border-ink-700 px-2 py-1.5">
         <input
           ref={inputRef}
-          className="input w-36 font-mono text-sm"
+          className="input w-32 font-mono text-sm"
           value={notation}
           onChange={(e) => setNotation(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && doRoll()}
@@ -71,17 +80,48 @@ function DiceWidget({ campaignId }: WidgetContext) {
           onKeyDown={(e) => e.key === "Enter" && doRoll()}
         />
         <button
+          className="btn-ghost h-7 px-1.5 text-xs"
+          onClick={() => doRoll("adv")}
+          disabled={roll.isPending || !notation.trim()}
+          title="Roll twice, keep the higher total (advantage)"
+        >
+          Adv
+        </button>
+        <button
+          className="btn-ghost h-7 px-1.5 text-xs"
+          onClick={() => doRoll("dis")}
+          disabled={roll.isPending || !notation.trim()}
+          title="Roll twice, keep the lower total (disadvantage)"
+        >
+          Dis
+        </button>
+        <button
           className="btn-primary px-3 font-semibold"
-          onClick={doRoll}
+          onClick={() => doRoll()}
           disabled={roll.isPending || !notation.trim()}
         >
           Roll
         </button>
       </div>
 
+      {/* DM-only hidden toggle */}
+      {isDM && (
+        <label
+          className={clsx(
+            "flex cursor-pointer select-none items-center gap-1.5 border-b border-ink-700 px-2 py-1 text-xs",
+            hidden ? "bg-amber-500/10 text-amber-300" : "text-ink-400",
+          )}
+          title="Hidden rolls stay GM-only — they never appear in the player feed"
+        >
+          <input type="checkbox" checked={hidden} onChange={(e) => setHidden(e.target.checked)} />
+          🔒 Hidden roll (GM only)
+        </label>
+      )}
+
       {/* Latest result banner */}
       {latest && (
         <div className="flex items-baseline gap-2 border-b border-ink-700 bg-accent-500/10 px-3 py-2">
+          {latest.hidden && <span title="Hidden roll">🔒</span>}
           <span className="font-mono text-xs text-ink-400">{latest.notation}</span>
           <span className="text-ink-400">→</span>
           <span className="text-2xl font-bold text-accent-500">{latest.result}</span>
@@ -100,12 +140,15 @@ function DiceWidget({ campaignId }: WidgetContext) {
                 key={r.id}
                 className={clsx(
                   "rounded-md border px-2 py-1.5",
-                  idx === 0
-                    ? "border-accent-500/40 bg-accent-500/5"
-                    : "border-ink-800 bg-ink-900",
+                  r.hidden
+                    ? "border-amber-500/30 bg-amber-500/5"
+                    : idx === 0
+                      ? "border-accent-500/40 bg-accent-500/5"
+                      : "border-ink-800 bg-ink-900",
                 )}
               >
                 <div className="flex items-baseline gap-2">
+                  {r.hidden && <span title="Hidden — GM only">🔒</span>}
                   <span className="font-mono text-ink-300">{r.notation}</span>
                   <span className="text-ink-500">→</span>
                   <span
@@ -118,6 +161,9 @@ function DiceWidget({ campaignId }: WidgetContext) {
                   </span>
                   {r.label && (
                     <span className="text-xs text-ink-500 italic">{r.label}</span>
+                  )}
+                  {r.rollerName && (
+                    <span className="text-xs text-ink-600">· {r.rollerName}</span>
                   )}
                   <span className="ml-auto shrink-0 font-mono text-xs text-ink-600">
                     {fmtTime(r.createdAt)}
@@ -142,7 +188,8 @@ function DiceWidget({ campaignId }: WidgetContext) {
 registerWidget({
   type: "dice",
   title: "Dice Roller",
-  defaultSize: { w: 360, h: 400 },
+  defaultSize: { w: 380, h: 420 },
+  broadcastKey: "dice",
   Component: DiceWidget,
 });
 

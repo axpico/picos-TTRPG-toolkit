@@ -232,6 +232,8 @@ model Combatant {
   initiative     Int
   hp             Int?
   hpMax          Int?
+  ac             Int?
+  defeated       Boolean   @default(false)
   conditionsJson String    @default("[]")
   notes          String?
   isPC           Boolean   @default(false)
@@ -281,6 +283,7 @@ model ProgressClock {
   filled      Int      @default(0)
   description String?
   color       String   @default("#6366f1")
+  secret      Boolean  @default(false)
   order       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -313,6 +316,7 @@ model DiceRoll {
   result        Int
   breakdownJson String
   label         String?
+  hidden        Boolean  @default(false)
   createdAt     DateTime @default(now())
 
   @@index([campaignId, createdAt])

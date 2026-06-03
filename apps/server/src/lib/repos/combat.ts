@@ -13,11 +13,24 @@ export function toCombatantDto(row: DbCombatant): CombatantDto {
     initiative: row.initiative,
     hp: row.hp,
     hpMax: row.hpMax,
+    ac: row.ac,
+    defeated: row.defeated,
     conditions: parseJsonField(row.conditionsJson, conditionsSchema, []),
     notes: row.notes,
     isPC: row.isPC,
     order: row.order,
   };
+}
+
+/**
+ * Keep `currentTurn` pointing at a valid combatant index after the list size
+ * changes (e.g. a combatant is removed). Returns 0 when the list is empty.
+ */
+export function clampTurn(currentTurn: number, total: number): number {
+  if (total <= 0) return 0;
+  if (currentTurn < 0) return 0;
+  if (currentTurn >= total) return total - 1;
+  return currentTurn;
 }
 
 export function toEncounterDto(row: DbEncounter & { combatants: DbCombatant[] }): EncounterDto {

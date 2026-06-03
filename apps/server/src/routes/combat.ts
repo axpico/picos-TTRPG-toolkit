@@ -7,7 +7,8 @@ import {
   updateEncounterInput,
 } from "@toolkit/shared";
 import { prisma } from "../db.js";
-import { toCombatantDto, toEncounterDto } from "../lib/repos/combat.js";
+import { clampTurn, toCombatantDto, toEncounterDto } from "../lib/repos/combat.js";
+import { rollNotation } from "../lib/dice.js";
 import { writeLog } from "../services/log.js";
 
 const cidParams = z.object({ id: z.string().min(1) });
@@ -143,6 +144,8 @@ export const combatRoutes: FastifyPluginAsync = async (app) => {
         initiative: body.initiative,
         hp: body.hp ?? null,
         hpMax: body.hpMax ?? null,
+        ac: body.ac ?? null,
+        defeated: body.defeated ?? false,
         conditionsJson: JSON.stringify(body.conditions ?? []),
         notes: body.notes ?? null,
         isPC: body.isPC ?? false,
@@ -170,6 +173,8 @@ export const combatRoutes: FastifyPluginAsync = async (app) => {
         ...(body.initiative !== undefined ? { initiative: body.initiative } : {}),
         ...(body.hp !== undefined ? { hp: body.hp ?? null } : {}),
         ...(body.hpMax !== undefined ? { hpMax: body.hpMax ?? null } : {}),
+        ...(body.ac !== undefined ? { ac: body.ac ?? null } : {}),
+        ...(body.defeated !== undefined ? { defeated: body.defeated } : {}),
         ...(body.conditions !== undefined
           ? { conditionsJson: JSON.stringify(body.conditions) }
           : {}),
@@ -190,13 +195,74 @@ export const combatRoutes: FastifyPluginAsync = async (app) => {
   app.delete("/:id/encounters/:encounterId/combatants/:combatantId", async (req, reply) => {
     const { id, encounterId, combatantId } = combatantParams.parse(req.params);
     const removed = await prisma.combatant.delete({ where: { id: combatantId } });
-    const enc = await prisma.encounter.findUniqueOrThrow({
+    let enc = await prisma.encounter.findUniqueOrThrow({
       where: { id: encounterId },
       include: { combatants: true },
     });
+    // Keep the turn marker in range now that a combatant is gone.
+    const clamped = clampTurn(enc.currentTurn, enc.combatants.length);
+    if (clamped !== enc.currentTurn) {
+      enc = await prisma.encounter.update({
+        where: { id: encounterId },
+        data: { currentTurn: clamped },
+        include: { combatants: true },
+      });
+    }
     const dto = toEncounterDto(enc);
     emit(app, id, "combat.update", { encounter: dto });
     await writeLog(app, id, "combat.combatant.remove", `Removed ${removed.name} from "${enc.name}"`);
     reply.code(204).send();
+  });
+
+  // Step the turn marker backwards (wrapping to the previous round).
+  app.post("/:id/encounters/:encounterId/prev-turn", async (req) => {
+    const { id, encounterId } = encParams.parse(req.params);
+    const enc = await prisma.encounter.findUniqueOrThrow({
+      where: { id: encounterId },
+      include: { combatants: true },
+    });
+    const total = enc.combatants.length;
+    if (total === 0) return toEncounterDto(enc);
+    let nextTurn = enc.currentTurn - 1;
+    let nextRound = enc.round;
+    if (nextTurn < 0) {
+      nextTurn = total - 1;
+      nextRound = Math.max(1, enc.round - 1);
+    }
+    const updated = await prisma.encounter.update({
+      where: { id: encounterId },
+      data: { currentTurn: nextTurn, round: nextRound },
+      include: { combatants: true },
+    });
+    const dto = toEncounterDto(updated);
+    emit(app, id, "combat.update", { encounter: dto });
+    return dto;
+  });
+
+  // Roll 1d20 initiative for every combatant (optionally NPCs only).
+  app.post("/:id/encounters/:encounterId/roll-initiative", async (req) => {
+    const { id, encounterId } = encParams.parse(req.params);
+    const body = z.object({ onlyNpc: z.boolean().optional() }).parse(req.body ?? {});
+    const enc = await prisma.encounter.findUniqueOrThrow({
+      where: { id: encounterId },
+      include: { combatants: true },
+    });
+    const targets = body.onlyNpc ? enc.combatants.filter((c) => !c.isPC) : enc.combatants;
+    await prisma.$transaction(
+      targets.map((c) =>
+        prisma.combatant.update({
+          where: { id: c.id },
+          data: { initiative: rollNotation("1d20").total },
+        }),
+      ),
+    );
+    const updated = await prisma.encounter.findUniqueOrThrow({
+      where: { id: encounterId },
+      include: { combatants: true },
+    });
+    const dto = toEncounterDto(updated);
+    emit(app, id, "combat.update", { encounter: dto });
+    await writeLog(app, id, "combat.initiative", `Rolled initiative for "${dto.name}"`);
+    return dto;
   });
 };

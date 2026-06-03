@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { CalendarDefinition } from "@toolkit/shared";
-import { advance, advanceToMinutes, clampDay } from "../../src/lib/calendar.js";
+import { dayPhase, weekdayIndex, weekdayName } from "@toolkit/shared";
+import { advance, advanceToMinutes, clampDay, clampTime } from "../../src/lib/calendar.js";
 
 // A small, easy-to-reason-about calendar: 3 months of 10/5/20 days, 4h days, 60m hours.
 const DEF: CalendarDefinition = {
@@ -68,4 +69,44 @@ test("advanceToMinutes honors a custom secondsPerRound", () => {
 
 test("advanceToMinutes defaults to zero with no input", () => {
   assert.equal(advanceToMinutes(DEF, {}), 0);
+});
+
+test("weekdayIndex cycles through the weekday names", () => {
+  // 2 weekdays (A,B); epoch day 0 = index 0.
+  assert.equal(weekdayIndex(DEF, 1, 1, 1), 0);
+  assert.equal(weekdayIndex(DEF, 1, 1, 2), 1);
+  assert.equal(weekdayIndex(DEF, 1, 1, 3), 0);
+});
+
+test("weekdayName accounts for month and year boundaries", () => {
+  // Year 1 has 10+5+20 = 35 days (odd) → year 2 day 1 lands on the other weekday.
+  assert.equal(weekdayName(DEF, 1, 1, 1), "A");
+  assert.equal(weekdayName(DEF, 2, 1, 1), "B");
+  // Crossing month 1 (10 days) into month 2 keeps the running count consistent.
+  assert.equal(weekdayName(DEF, 1, 2, 1), weekdayName(DEF, 1, 1, 11));
+});
+
+test("dayPhase labels by fraction of the day", () => {
+  // 4-hour day: hours 0..3 map to Night/Morning/Afternoon/Evening.
+  assert.equal(dayPhase(DEF, 0), "Night");
+  assert.equal(dayPhase(DEF, 1), "Morning");
+  assert.equal(dayPhase(DEF, 2), "Afternoon");
+  assert.equal(dayPhase(DEF, 3), "Evening");
+});
+
+test("clampTime bounds month, day, hour and minute", () => {
+  // Month 9 → 3, day 99 → 20 (month 3 length), hour 9 → 3, minute 99 → 59.
+  assert.deepEqual(clampTime(DEF, { mo: 9, d: 99, h: 9, mi: 99 }), {
+    mo: 3,
+    d: 20,
+    h: 3,
+    mi: 59,
+  });
+  // Floors: month 0 → 1, day 0 → 1, negatives → 0.
+  assert.deepEqual(clampTime(DEF, { mo: 0, d: 0, h: -5, mi: -5 }), {
+    mo: 1,
+    d: 1,
+    h: 0,
+    mi: 0,
+  });
 });

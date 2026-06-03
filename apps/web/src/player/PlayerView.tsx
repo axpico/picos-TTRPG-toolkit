@@ -12,7 +12,7 @@ import { Skeleton } from "../components/Skeleton.js";
 import { usePlayerState } from "./usePlayer.js";
 import { PlayerDock } from "./PlayerDock.js";
 import { MapStage } from "./MapStage.js";
-import { formatClock, formatGameDate } from "./format.js";
+import { formatClock, formatDayPhase, formatGameDate } from "./format.js";
 
 const STATUS_LABEL: Record<PartyMemberStatus, string> = {
   active: "Active",
@@ -125,7 +125,7 @@ function StageContent({
   s: NonNullable<ReturnType<typeof usePlayerState>["data"]>;
   myId: string | undefined;
 }) {
-  const { calendar, weather, rolltable, map, combat, party } = s.data;
+  const { calendar, weather, rolltable, map, combat, party, clocks, dice } = s.data;
   const anyActive = s.broadcasts.some((b) => b.active);
 
   if (!anyActive) {
@@ -147,6 +147,7 @@ function StageContent({
               <span className="text-xs uppercase tracking-wide text-ink-500">Date</span>
               <span className="font-medium">{formatGameDate(calendar)}</span>
               <span className="font-mono text-ink-300">{formatClock(calendar)}</span>
+              <span className="text-xs text-ink-400">{formatDayPhase(calendar)}</span>
             </div>
           )}
           {weather && (
@@ -239,6 +240,65 @@ function StageContent({
               );
             })}
             {party.length === 0 && <li className="text-ink-400">No party members listed.</li>}
+          </ul>
+        </section>
+      )}
+
+      {clocks && clocks.length > 0 && (
+        <section className="card p-4">
+          <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-300">Clocks</h2>
+          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {clocks.map((clock) => {
+              const full = clock.filled >= clock.segments;
+              return (
+                <li
+                  key={clock.id}
+                  className={clsx(
+                    "rounded-md border px-3 py-2",
+                    full ? "border-red-500/50 bg-red-900/10" : "border-ink-700 bg-ink-900",
+                  )}
+                >
+                  <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                    <span className="font-medium">{clock.name}</span>
+                    <span className={clsx("font-mono text-xs", full ? "text-red-400" : "text-ink-400")}>
+                      {clock.filled}/{clock.segments}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {Array.from({ length: clock.segments }, (_, i) => (
+                      <span
+                        key={i}
+                        className="h-3 w-3 rounded-full border border-ink-700"
+                        style={{ backgroundColor: i < clock.filled ? clock.color : "transparent" }}
+                      />
+                    ))}
+                  </div>
+                  {clock.description && (
+                    <div className="mt-1 text-xs text-ink-400">{clock.description}</div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {dice && dice.length > 0 && (
+        <section className="card p-4">
+          <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-300">Recent rolls</h2>
+          <ul className="space-y-1 text-sm">
+            {dice.map((r) => (
+              <li
+                key={r.id}
+                className="flex items-baseline gap-2 rounded-md border border-ink-700 bg-ink-900 px-3 py-1.5"
+              >
+                <span className="font-mono text-xs text-ink-400">{r.notation}</span>
+                <span className="text-ink-500">→</span>
+                <span className="font-bold text-accent-400">{r.result}</span>
+                {r.label && <span className="text-xs italic text-ink-500">{r.label}</span>}
+                {r.rollerName && <span className="ml-auto text-xs text-ink-500">{r.rollerName}</span>}
+              </li>
+            ))}
           </ul>
         </section>
       )}

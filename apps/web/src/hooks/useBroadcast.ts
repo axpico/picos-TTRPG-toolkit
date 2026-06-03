@@ -58,6 +58,11 @@ export function useBroadcast({ url, campaignId, onEvent, onStatus }: Options) {
       }
       if (event.type.startsWith("dice.")) {
         qc.invalidateQueries({ queryKey: ["dice", campaignId] });
+        qc.invalidateQueries({ queryKey: ["player", campaignId] });
+      }
+      if (event.type.startsWith("clock.")) {
+        qc.invalidateQueries({ queryKey: ["clocks", campaignId] });
+        qc.invalidateQueries({ queryKey: ["player", campaignId] });
       }
       if (event.type === "broadcast.change") {
         qc.invalidateQueries({ queryKey: ["broadcasts", campaignId] });
@@ -103,6 +108,9 @@ export function useBroadcast({ url, campaignId, onEvent, onStatus }: Options) {
       "location.update",
       "rolltable.roll",
       "dice.roll",
+      "clock.create",
+      "clock.update",
+      "clock.delete",
     ];
     for (const t of eventTypes) source.addEventListener(t, onCustom as EventListener);
 

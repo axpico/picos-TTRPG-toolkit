@@ -10,6 +10,7 @@ export function toClockDto(row: DbClock): ClockDto {
     filled: row.filled,
     description: row.description,
     color: row.color,
+    secret: row.secret,
     order: row.order,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

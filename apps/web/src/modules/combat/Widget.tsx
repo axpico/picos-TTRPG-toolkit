@@ -9,7 +9,9 @@ import {
   useDeleteEncounter,
   useEncounters,
   useNextTurn,
+  usePrevTurn,
   useRemoveCombatant,
+  useRollInitiative,
   useUpdateCombatant,
   useUpdateEncounter,
 } from "./api.js";
@@ -94,10 +96,34 @@ interface EncounterPaneProps {
 function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) {
   const update = useUpdateEncounter(campaignId);
   const next = useNextTurn(campaignId);
+  const prev = usePrevTurn(campaignId);
+  const rollInit = useRollInitiative(campaignId);
   const addCombatant = useAddCombatant(campaignId);
   const updateCombatant = useUpdateCombatant(campaignId);
   const removeCombatant = useRemoveCombatant(campaignId);
   const [draft, setDraft] = useState({ name: "", initiative: "", isPC: false });
+
+  // Re-number `order` so the list is sorted by initiative (desc), persisting
+  // each changed combatant so the new ordering sticks across reloads.
+  const sortByInitiative = () => {
+    const sorted = [...encounter.combatants].sort((a, b) => b.initiative - a.initiative);
+    sorted.forEach((c, idx) => {
+      if (c.order !== idx) {
+        updateCombatant.mutate({ encounterId: encounter.id, id: c.id, input: { order: idx } });
+      }
+    });
+  };
+
+  const moveCombatant = (index: number, dir: -1 | 1) => {
+    const list = encounter.combatants;
+    const target = index + dir;
+    if (target < 0 || target >= list.length) return;
+    const a = list[index];
+    const b = list[target];
+    if (!a || !b) return;
+    updateCombatant.mutate({ encounterId: encounter.id, id: a.id, input: { order: b.order } });
+    updateCombatant.mutate({ encounterId: encounter.id, id: b.id, input: { order: a.order } });
+  };
 
   const submitCombatant = () => {
     const name = draft.name.trim();
@@ -123,6 +149,14 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
           {isActive ? "End combat" : "Start combat"}
         </button>
         <button
+          className="btn-ghost px-2 font-medium"
+          disabled={!hasCombatants}
+          onClick={() => prev.mutate(encounter.id)}
+          title="Back to previous turn"
+        >
+          ← Prev
+        </button>
+        <button
           className={clsx(
             "btn-ghost px-3 font-medium",
             isActive && hasCombatants && "text-accent-500 ring-1 ring-accent-500/50",
@@ -132,6 +166,22 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
           title="Advance to next turn (N)"
         >
           Next turn →
+        </button>
+        <button
+          className="btn-ghost px-2 text-xs"
+          disabled={!hasCombatants || rollInit.isPending}
+          onClick={() => rollInit.mutate({ encounterId: encounter.id, onlyNpc: true })}
+          title="Roll 1d20 initiative for all non-PC combatants"
+        >
+          🎲 Init (NPCs)
+        </button>
+        <button
+          className="btn-ghost px-2 text-xs"
+          disabled={!hasCombatants}
+          onClick={sortByInitiative}
+          title="Sort combatants by initiative (high to low)"
+        >
+          Sort
         </button>
         <div className="ml-auto flex items-center gap-3 text-xs text-ink-400">
           <span>
@@ -160,6 +210,7 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
               updateCombatant.mutate({ encounterId: encounter.id, id: c.id, input })
             }
             onRemove={() => removeCombatant.mutate({ encounterId: encounter.id, id: c.id })}
+            onMove={(dir) => moveCombatant(idx, dir)}
           />
         ))}
         {!hasCombatants && (
@@ -214,19 +265,24 @@ interface CombatantRowProps {
     input: Parameters<ReturnType<typeof useUpdateCombatant>["mutate"]>[0]["input"],
   ) => void;
   onRemove: () => void;
+  onMove: (dir: -1 | 1) => void;
 }
 
-function CombatantRow({ combatant, isCurrent, onChange, onRemove }: CombatantRowProps) {
+function CombatantRow({ combatant, isCurrent, onChange, onRemove, onMove }: CombatantRowProps) {
   const [localName, setLocalName] = useState(combatant.name);
   const [localInit, setLocalInit] = useState(combatant.initiative);
   const [localHp, setLocalHp] = useState(combatant.hp ?? 0);
   const [localHpMax, setLocalHpMax] = useState(combatant.hpMax ?? 0);
+  const [localAc, setLocalAc] = useState(combatant.ac ?? 0);
   const [localConditions, setLocalConditions] = useState(combatant.conditions.join(", "));
+  const [localNotes, setLocalNotes] = useState(combatant.notes ?? "");
   const [dmgInput, setDmgInput] = useState("");
 
   useEffect(() => setLocalHp(combatant.hp ?? 0), [combatant.hp]);
   useEffect(() => setLocalHpMax(combatant.hpMax ?? 0), [combatant.hpMax]);
+  useEffect(() => setLocalAc(combatant.ac ?? 0), [combatant.ac]);
   useEffect(() => setLocalConditions(combatant.conditions.join(", ")), [combatant.conditions]);
+  useEffect(() => setLocalNotes(combatant.notes ?? ""), [combatant.notes]);
 
   const applyDamage = (sign: 1 | -1) => {
     const n = Number(dmgInput);
@@ -247,16 +303,34 @@ function CombatantRow({ combatant, isCurrent, onChange, onRemove }: CombatantRow
     <li
       className={clsx(
         "rounded-md border px-2 py-2 transition-colors",
-        isCurrent
-          ? "border-accent-500 bg-accent-500/10 shadow-[inset_3px_0_0_theme(colors.accent.500)]"
-          : "border-ink-700 bg-ink-900",
+        combatant.defeated
+          ? "border-ink-800 bg-ink-950 opacity-60"
+          : isCurrent
+            ? "border-accent-500 bg-accent-500/10 shadow-[inset_3px_0_0_theme(colors.accent.500)]"
+            : "border-ink-700 bg-ink-900",
       )}
     >
       {/* Name + initiative + badges */}
       <div className="flex items-center gap-1.5">
-        {isCurrent && (
+        {isCurrent && !combatant.defeated && (
           <span className="text-xs font-bold text-accent-500 shrink-0">▶</span>
         )}
+        <div className="flex shrink-0 flex-col">
+          <button
+            className="h-3 leading-none text-[10px] text-ink-500 hover:text-ink-200"
+            onClick={() => onMove(-1)}
+            title="Move up"
+          >
+            ▲
+          </button>
+          <button
+            className="h-3 leading-none text-[10px] text-ink-500 hover:text-ink-200"
+            onClick={() => onMove(1)}
+            title="Move down"
+          >
+            ▼
+          </button>
+        </div>
         <input
           type="number"
           className="input w-14 text-center font-mono text-sm"
@@ -266,7 +340,11 @@ function CombatantRow({ combatant, isCurrent, onChange, onRemove }: CombatantRow
           title="Initiative"
         />
         <input
-          className={clsx("input flex-1", combatant.isPC && "font-medium text-sky-300")}
+          className={clsx(
+            "input flex-1",
+            combatant.isPC && "font-medium text-sky-300",
+            combatant.defeated && "line-through",
+          )}
           value={localName}
           onChange={(e) => setLocalName(e.target.value)}
           onBlur={() => localName !== combatant.name && onChange({ name: localName })}
@@ -276,6 +354,16 @@ function CombatantRow({ combatant, isCurrent, onChange, onRemove }: CombatantRow
             PC
           </span>
         )}
+        <button
+          className={clsx(
+            "btn-ghost h-6 px-1.5 text-xs",
+            combatant.defeated ? "text-emerald-400" : "text-ink-500 hover:text-red-400",
+          )}
+          onClick={() => onChange({ defeated: !combatant.defeated })}
+          title={combatant.defeated ? "Revive" : "Mark defeated"}
+        >
+          {combatant.defeated ? "Revive" : "💀"}
+        </button>
         <InlineConfirm onConfirm={onRemove} title="Remove combatant" />
       </div>
 
@@ -328,6 +416,15 @@ function CombatantRow({ combatant, isCurrent, onChange, onRemove }: CombatantRow
         >
           Heal
         </button>
+        <span className="ml-auto text-xs text-ink-600">AC</span>
+        <input
+          type="number"
+          className="input w-12 text-center font-mono text-xs"
+          value={localAc}
+          onChange={(e) => setLocalAc(Number(e.target.value))}
+          onBlur={() => localAc !== (combatant.ac ?? 0) && onChange({ ac: localAc })}
+          title="Armor Class"
+        />
       </div>
 
       {/* HP bar */}
@@ -348,6 +445,17 @@ function CombatantRow({ combatant, isCurrent, onChange, onRemove }: CombatantRow
               .map((s) => s.trim())
               .filter(Boolean),
           })
+        }
+      />
+
+      {/* GM notes */}
+      <input
+        className="input mt-1 text-xs text-ink-400"
+        placeholder="GM notes (hidden from players)…"
+        value={localNotes}
+        onChange={(e) => setLocalNotes(e.target.value)}
+        onBlur={() =>
+          localNotes !== (combatant.notes ?? "") && onChange({ notes: localNotes || undefined })
         }
       />
     </li>

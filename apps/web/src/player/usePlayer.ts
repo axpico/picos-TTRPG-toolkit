@@ -2,8 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   Broadcast,
   Calendar,
+  DiceRoll,
   Encounter,
   PartyMember,
+  ProgressClock,
   PublicLocation,
   RollTableResult,
   UpdateMyCharacterInput,
@@ -21,6 +23,8 @@ export interface PlayerState {
     calendar: Calendar | null;
     map: PublicLocation | null;
     rolltable: RollTableResult | null;
+    clocks: ProgressClock[] | null;
+    dice: DiceRoll[] | null;
   };
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { CalendarDefinition } from "@toolkit/shared";
+import { dayPhase, weekdayName, type CalendarDefinition } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { useAdvanceCalendar, useCalendar, useSetCalendar } from "./api.js";
 
@@ -54,10 +54,17 @@ function CalendarWidget({ campaignId }: WidgetContext) {
       <div className="border-b border-ink-700 p-3">
         <div className="text-xs uppercase tracking-wide text-ink-400">In-world time</div>
         <div className="mt-1 text-lg font-semibold">
+          <span className="text-ink-300">{weekdayName(def, c.currentYear, c.currentMonth, c.currentDay)}</span>
+          {", "}
           {formatDate(def, c.currentYear, c.currentMonth, c.currentDay)}
         </div>
-        <div className="font-mono text-sm text-ink-300">
-          {pad(c.currentHour)}:{pad(c.currentMinute)}
+        <div className="flex items-baseline gap-2">
+          <span className="font-mono text-sm text-ink-300">
+            {pad(c.currentHour)}:{pad(c.currentMinute)}
+          </span>
+          <span className="rounded-full bg-ink-800 px-2 py-0.5 text-xs text-ink-300">
+            {dayPhase(def, c.currentHour)}
+          </span>
         </div>
       </div>
 
@@ -84,6 +91,29 @@ function CalendarWidget({ campaignId }: WidgetContext) {
         <button className="btn-ghost" onClick={() => advance.mutate({ days: 7 })}>
           +1 week
         </button>
+      </div>
+
+      {/* Time-of-day presets */}
+      <div className="grid grid-cols-4 gap-1.5 border-t border-ink-700 px-3 pb-3 text-xs">
+        {(
+          [
+            ["Dawn", 0.25],
+            ["Noon", 0.5],
+            ["Dusk", 0.75],
+            ["Midnight", 0],
+          ] as const
+        ).map(([label, frac]) => (
+          <button
+            key={label}
+            className="btn-ghost"
+            onClick={() =>
+              set.mutate({ currentHour: Math.round(def.hoursPerDay * frac), currentMinute: 0 })
+            }
+            title={`Set time to ${label.toLowerCase()}`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       <div className="grid grid-cols-2 gap-1.5 border-t border-ink-700 p-3 text-sm">
@@ -130,6 +160,17 @@ function CalendarWidget({ campaignId }: WidgetContext) {
             max={def.hoursPerDay - 1}
             value={c.currentHour}
             onChange={(e) => set.mutate({ currentHour: Number(e.target.value) })}
+          />
+        </label>
+        <label className="flex items-center gap-1 text-xs text-ink-400">
+          Minute
+          <input
+            type="number"
+            className="input"
+            min={0}
+            max={def.minutesPerHour - 1}
+            value={c.currentMinute}
+            onChange={(e) => set.mutate({ currentMinute: Number(e.target.value) })}
           />
         </label>
       </div>

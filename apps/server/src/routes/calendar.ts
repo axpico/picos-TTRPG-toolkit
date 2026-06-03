@@ -7,7 +7,7 @@ import {
 } from "@toolkit/shared";
 import { prisma } from "../db.js";
 import { toCalendarDto } from "../lib/repos/calendar.js";
-import { advance, advanceToMinutes, clampDay } from "../lib/calendar.js";
+import { advance, advanceToMinutes, clampTime } from "../lib/calendar.js";
 import { writeLog } from "../services/log.js";
 
 const cidParams = z.object({ id: z.string().min(1) });
@@ -36,8 +36,12 @@ export const calendarRoutes: FastifyPluginAsync = async (app) => {
     const existing = await ensureCalendar(id);
     const dto = toCalendarDto(existing);
     const def = body.definition ?? dto.definition;
-    const month = body.currentMonth ?? dto.currentMonth;
-    const day = clampDay(def, month, body.currentDay ?? dto.currentDay);
+    const t = clampTime(def, {
+      mo: body.currentMonth ?? dto.currentMonth,
+      d: body.currentDay ?? dto.currentDay,
+      h: body.currentHour ?? dto.currentHour,
+      mi: body.currentMinute ?? dto.currentMinute,
+    });
     const updated = await prisma.calendar.update({
       where: { campaignId: id },
       data: {
@@ -45,10 +49,10 @@ export const calendarRoutes: FastifyPluginAsync = async (app) => {
           ? { definitionJson: JSON.stringify(body.definition) }
           : {}),
         currentYear: body.currentYear ?? dto.currentYear,
-        currentMonth: month,
-        currentDay: day,
-        currentHour: body.currentHour ?? dto.currentHour,
-        currentMinute: body.currentMinute ?? dto.currentMinute,
+        currentMonth: t.mo,
+        currentDay: t.d,
+        currentHour: t.h,
+        currentMinute: t.mi,
       },
     });
     const next = toCalendarDto(updated);

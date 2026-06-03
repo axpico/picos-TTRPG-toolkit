@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { rollNotation } from "../../src/lib/dice.js";
+import { rollNotation, rollWithMode } from "../../src/lib/dice.js";
 
 test("a constant evaluates to itself", () => {
   const r = rollNotation("5");
@@ -19,6 +19,23 @@ test("1d20 stays within [1, 20] and reports one roll", () => {
       assert.equal(term.sides, 20);
       assert.equal(term.rolls.length, 1);
     }
+  }
+});
+
+test("rollWithMode without a mode is a plain in-range roll", () => {
+  for (let i = 0; i < 100; i++) {
+    const r = rollWithMode("1d20");
+    assert.ok(r.total >= 1 && r.total <= 20);
+  }
+});
+
+test("rollWithMode advantage/disadvantage stay within a single die's range", () => {
+  // The kept total is one of two independent rolls, so it must still be valid.
+  for (let i = 0; i < 100; i++) {
+    const adv = rollWithMode("1d6", "adv");
+    const dis = rollWithMode("1d6", "dis");
+    assert.ok(adv.total >= 1 && adv.total <= 6);
+    assert.ok(dis.total >= 1 && dis.total <= 6);
   }
 });
 

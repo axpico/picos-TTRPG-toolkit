@@ -11,6 +11,7 @@ const clock = (over: Partial<DbClock> = {}): DbClock => ({
   filled: 2,
   description: null,
   color: "#6366f1",
+  secret: false,
   order: 0,
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
   updatedAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -24,4 +25,19 @@ test("maps all fields and serializes dates", () => {
   assert.equal(dto.filled, 3);
   assert.equal(dto.description, "The cult's plan");
   assert.equal(dto.createdAt, "2026-01-01T00:00:00.000Z");
+});
+
+test("maps the secret flag", () => {
+  assert.equal(toClockDto(clock()).secret, false);
+  assert.equal(toClockDto(clock({ secret: true })).secret, true);
+});
+
+test("player projection helper excludes secret clocks", () => {
+  // Mirrors the player-state filter: only non-secret clocks are projected.
+  const clocks = [clock({ id: "a" }), clock({ id: "b", secret: true })].map(toClockDto);
+  const visible = clocks.filter((c) => !c.secret);
+  assert.deepEqual(
+    visible.map((c) => c.id),
+    ["a"],
+  );
 });

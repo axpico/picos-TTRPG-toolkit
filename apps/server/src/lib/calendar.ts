@@ -16,6 +16,22 @@ export function clampDay(def: CalendarDefinition, month: number, day: number): n
 }
 
 /**
+ * Clamp a whole date/time to valid ranges for the calendar definition: month to
+ * 1..monthCount, day to the month's length, hour to 0..hoursPerDay-1, minute to
+ * 0..minutesPerHour-1. Year is passed through unchanged.
+ */
+export function clampTime(
+  def: CalendarDefinition,
+  t: { mo: number; d: number; h: number; mi: number },
+): { mo: number; d: number; h: number; mi: number } {
+  const mo = Math.max(1, Math.min(def.monthNames.length, t.mo));
+  const d = clampDay(def, mo, t.d);
+  const h = Math.max(0, Math.min(def.hoursPerDay - 1, t.h));
+  const mi = Math.max(0, Math.min(def.minutesPerHour - 1, t.mi));
+  return { mo, d, h, mi };
+}
+
+/**
  * Advance a calendar state forward by `totalMinutes` (>= 0), rolling minutes →
  * hours → days → months → years using the calendar definition. Month lengths
  * are honored per-month via `daysPerMonth`.

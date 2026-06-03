@@ -75,6 +75,17 @@ function ClocksWidget({ campaignId }: WidgetContext) {
     create.mutate({ name, segments: newSegments }, { onSuccess: () => setNewName("") });
   };
 
+  const clocks = list.data ?? [];
+  const moveClock = (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (target < 0 || target >= clocks.length) return;
+    const a = clocks[index];
+    const b = clocks[target];
+    if (!a || !b) return;
+    update.mutate({ id: a.id, input: { order: b.order } });
+    update.mutate({ id: b.id, input: { order: a.order } });
+  };
+
   return (
     <div className="flex h-full flex-col">
       {/* New clock bar */}
@@ -112,14 +123,15 @@ function ClocksWidget({ campaignId }: WidgetContext) {
 
       {/* Clock grid */}
       <div className="flex-1 overflow-auto p-2">
-        {list.data && list.data.length > 0 ? (
+        {clocks.length > 0 ? (
           <div className="grid grid-cols-2 gap-2">
-            {list.data.map((clock) => (
+            {clocks.map((clock, idx) => (
               <ClockCard
                 key={clock.id}
                 clock={clock}
                 onChange={(input) => update.mutate({ id: clock.id, input })}
                 onDelete={() => remove.mutate(clock.id)}
+                onMove={(dir) => moveClock(idx, dir)}
               />
             ))}
           </div>
@@ -139,9 +151,10 @@ interface ClockCardProps {
   clock: ProgressClock;
   onChange: (input: UpdateClockInput) => void;
   onDelete: () => void;
+  onMove: (dir: -1 | 1) => void;
 }
 
-function ClockCard({ clock, onChange, onDelete }: ClockCardProps) {
+function ClockCard({ clock, onChange, onDelete, onMove }: ClockCardProps) {
   const [localName, setLocalName] = useState(clock.name);
   const [localDesc, setLocalDesc] = useState(clock.description ?? "");
 
@@ -160,19 +173,47 @@ function ClockCard({ clock, onChange, onDelete }: ClockCardProps) {
     <div
       className={clsx(
         "flex flex-col gap-1.5 rounded-md border p-2 text-sm",
-        isFull
-          ? "border-red-500/50 bg-red-900/10"
-          : "border-ink-700 bg-ink-900",
+        clock.secret
+          ? "border-amber-500/40 bg-amber-500/5"
+          : isFull
+            ? "border-red-500/50 bg-red-900/10"
+            : "border-ink-700 bg-ink-900",
       )}
     >
       {/* Name row */}
       <div className="flex items-center gap-1">
+        <div className="flex shrink-0 flex-col">
+          <button
+            className="h-3 leading-none text-[10px] text-ink-500 hover:text-ink-200"
+            onClick={() => onMove(-1)}
+            title="Move up"
+          >
+            ▲
+          </button>
+          <button
+            className="h-3 leading-none text-[10px] text-ink-500 hover:text-ink-200"
+            onClick={() => onMove(1)}
+            title="Move down"
+          >
+            ▼
+          </button>
+        </div>
         <input
           className="input flex-1 text-sm font-medium"
           value={localName}
           onChange={(e) => setLocalName(e.target.value)}
           onBlur={() => localName !== clock.name && onChange({ name: localName })}
         />
+        <button
+          className={clsx(
+            "btn-ghost h-6 px-1 text-xs",
+            clock.secret ? "text-amber-400" : "text-ink-500 hover:text-ink-200",
+          )}
+          onClick={() => onChange({ secret: !clock.secret })}
+          title={clock.secret ? "Secret — hidden from players" : "Visible to players when broadcast"}
+        >
+          {clock.secret ? "🔒" : "🔓"}
+        </button>
         <InlineConfirm onConfirm={onDelete} title="Delete clock" />
       </div>
 
@@ -274,6 +315,7 @@ registerWidget({
   type: "clocks",
   title: "Progress Clocks",
   defaultSize: { w: 480, h: 480 },
+  broadcastKey: "clocks",
   Component: ClocksWidget,
 });
 

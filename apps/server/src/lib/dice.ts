@@ -41,3 +41,18 @@ export function rollNotation(notation: string, seed?: string) {
 
   return { notation, total, terms, breakdownJson: JSON.stringify(terms) };
 }
+
+/**
+ * Roll `notation` with optional advantage/disadvantage: the notation is rolled
+ * twice and the higher (adv) or lower (dis) total is kept. Without a mode this
+ * is a single plain roll. The kept roll's breakdown is what gets returned.
+ */
+export function rollWithMode(notation: string, mode?: "adv" | "dis") {
+  const first = rollNotation(notation);
+  if (!mode) return first;
+  const second = rollNotation(notation);
+  const keepHigher = mode === "adv";
+  const keep =
+    (keepHigher ? second.total > first.total : second.total < first.total) ? second : first;
+  return keep;
+}

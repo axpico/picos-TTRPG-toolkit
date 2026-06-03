@@ -13,6 +13,8 @@ import { toWeatherDto } from "../lib/repos/weather.js";
 import { toCalendarDto } from "../lib/repos/calendar.js";
 import { toBroadcastDto } from "../lib/repos/broadcast.js";
 import { toPublicLocation } from "../lib/repos/location.js";
+import { toClockDto } from "../lib/repos/clock.js";
+import { toDiceDto } from "../lib/repos/dice.js";
 import { canManageCharacter } from "../lib/auth.js";
 import { openSse } from "../plugins/sse.js";
 import { writeLog } from "../services/log.js";
@@ -56,20 +58,35 @@ export const playerRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
-    const [party, activeEncounter, weatherRow, calendarRow, mapRow] = await Promise.all([
-      prisma.partyMember.findMany({
-        where: { campaignId },
-        orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-      }),
-      prisma.encounter.findFirst({
-        where: { campaignId, active: true },
-        include: { combatants: true },
-        orderBy: { updatedAt: "desc" },
-      }),
-      prisma.weather.findUnique({ where: { campaignId } }),
-      prisma.calendar.findUnique({ where: { campaignId } }),
-      mapLocationId ? prisma.location.findUnique({ where: { id: mapLocationId } }) : Promise.resolve(null),
-    ]);
+    const [party, activeEncounter, weatherRow, calendarRow, mapRow, clockRows, diceRows] =
+      await Promise.all([
+        prisma.partyMember.findMany({
+          where: { campaignId },
+          orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+        }),
+        prisma.encounter.findFirst({
+          where: { campaignId, active: true },
+          include: { combatants: true },
+          orderBy: { updatedAt: "desc" },
+        }),
+        prisma.weather.findUnique({ where: { campaignId } }),
+        prisma.calendar.findUnique({ where: { campaignId } }),
+        mapLocationId ? prisma.location.findUnique({ where: { id: mapLocationId } }) : Promise.resolve(null),
+        active.has("clocks")
+          ? prisma.progressClock.findMany({
+              where: { campaignId, secret: false },
+              orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+            })
+          : Promise.resolve([]),
+        active.has("dice")
+          ? prisma.diceRoll.findMany({
+              where: { campaignId, hidden: false },
+              orderBy: { createdAt: "desc" },
+              take: 20,
+              include: { user: { select: { displayName: true, username: true } } },
+            })
+          : Promise.resolve([]),
+      ]);
 
     return {
       campaign: { id: campaign.id, name: campaign.name },
@@ -84,6 +101,8 @@ export const playerRoutes: FastifyPluginAsync = async (app) => {
             ? toPublicLocation(mapRow)
             : null,
         rolltable: active.has("rolltable:current") ? tableResult : null,
+        clocks: active.has("clocks") ? clockRows.map(toClockDto) : null,
+        dice: active.has("dice") ? diceRows.map((r) => toDiceDto(r, r.user)) : null,
       },
     };
   });
