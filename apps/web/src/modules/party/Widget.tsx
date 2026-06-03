@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import type { PartyMember, PartyMemberStatus } from "@toolkit/shared";
+import { sampleParty, type PartyMember, type PartyMemberStatus } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { HpBar, InlineConfirm } from "../shared.js";
 import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
@@ -55,6 +55,16 @@ function PartyTrackerWidget({ campaignId }: WidgetContext) {
           onClick={addMember}
         >
           Add
+        </button>
+        <button
+          className="btn-ghost whitespace-nowrap"
+          disabled={create.isPending}
+          title="Add a sample SRD party to this campaign"
+          onClick={() => {
+            for (const m of sampleParty) create.mutate(m);
+          }}
+        >
+          Load samples
         </button>
       </div>
 

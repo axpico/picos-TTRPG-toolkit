@@ -38,10 +38,12 @@ export function StatBlockEditor({
     <div className="space-y-4">
       {/* Core combat numbers */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <NumField label="Level" value={value.level} onChange={(n) => set({ level: n })} />
+        <TextField label="CR" value={value.cr} onChange={(v) => set({ cr: v })} placeholder="1/4" />
         <NumField label="AC" value={value.ac} onChange={(n) => set({ ac: n })} />
+        <NumField label="Prof." value={value.profBonus} onChange={(n) => set({ profBonus: n })} />
         {!hideHp && <NumField label="HP" value={value.hp} onChange={(n) => set({ hp: n })} />}
         {!hideHp && <NumField label="Max HP" value={value.hpMax} onChange={(n) => set({ hpMax: n })} />}
-        <NumField label="Prof." value={value.profBonus} onChange={(n) => set({ profBonus: n })} />
         <TextField
           label="Speed"
           value={value.speed}

@@ -1,7 +1,13 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import clsx from "clsx";
 import type { GenerateShopInput, Shop, ShopItem } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
+import { EmptyState } from "../../components/EmptyState.js";
+import { Markdown } from "../../components/Markdown.js";
+import { useConfirm } from "../../components/ConfirmDialog.js";
+import { useToast } from "../../components/Toast.js";
 import { InlineConfirm } from "../shared.js";
+import { ITEM_TYPES, RARITIES, fmtPrice, rarityColor } from "./constants.js";
 import {
   useCreateShop,
   useCreateShopItem,
@@ -26,6 +32,16 @@ function ShopWidget({ campaignId, state, setState }: WidgetContext) {
 
   return (
     <div className="flex h-full flex-col">
+      <datalist id="shop-item-types">
+        {ITEM_TYPES.map((t) => (
+          <option key={t} value={t} />
+        ))}
+      </datalist>
+      <datalist id="shop-item-rarities">
+        {RARITIES.map((r) => (
+          <option key={r} value={r} />
+        ))}
+      </datalist>
       <div className="flex items-center gap-1 border-b border-ink-700 p-2">
         <select
           className="input flex-1"
@@ -44,11 +60,9 @@ function ShopWidget({ campaignId, state, setState }: WidgetContext) {
         <button
           className="btn-primary px-2"
           onClick={() =>
-            create.mutate(
-              { name: "New shop" },
-              { onSuccess: (s) => select(s.id) },
-            )
+            create.mutate({ name: "New shop" }, { onSuccess: (s) => select(s.id) })
           }
+          title="New empty shop"
         >
           +
         </button>
@@ -62,10 +76,7 @@ function ShopWidget({ campaignId, state, setState }: WidgetContext) {
           onDelete={() => remove.mutate(selected.id, { onSuccess: () => select(null) })}
         />
       ) : (
-        <Generator
-          campaignId={campaignId}
-          onCreated={(id) => select(id)}
-        />
+        <Generator campaignId={campaignId} onCreated={(id) => select(id)} />
       )}
     </div>
   );
@@ -82,7 +93,51 @@ function ShopEditor({ shop, campaignId, onDelete }: EditorProps) {
   const addItem = useCreateShopItem(campaignId);
   const updateItem = useUpdateShopItem(campaignId);
   const removeItem = useDeleteShopItem(campaignId);
+  const confirm = useConfirm();
+  const toast = useToast();
   const [newItem, setNewItem] = useState("");
+  const [filter, setFilter] = useState("");
+  const [notesPreview, setNotesPreview] = useState(Boolean(shop.notes));
+
+  const items = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return shop.items;
+    return shop.items.filter(
+      (it) =>
+        it.name.toLowerCase().includes(q) ||
+        (it.type ?? "").toLowerCase().includes(q) ||
+        it.tags.some((t) => t.toLowerCase().includes(q)),
+    );
+  }, [shop.items, filter]);
+
+  const totalValue = useMemo(
+    () => shop.items.reduce((sum, it) => sum + (it.price ?? 0) * (it.stock ?? 1), 0),
+    [shop.items],
+  );
+
+  const adjustStock = (it: ShopItem, delta: number) => {
+    const next = Math.max(0, (it.stock ?? 0) + delta);
+    updateItem.mutate({ shopId: shop.id, id: it.id, input: { stock: next } });
+    if (next === 0 && delta < 0) toast(`${it.name} is out of stock`, "info");
+  };
+
+  const handleRemoveItem = async (it: ShopItem) => {
+    const ok = await confirm({
+      title: "Remove item",
+      message: `Remove "${it.name}" from this shop?`,
+      confirmLabel: "Remove",
+      danger: true,
+    });
+    if (ok) removeItem.mutate({ shopId: shop.id, id: it.id });
+  };
+
+  const submitNewItem = () => {
+    if (!newItem.trim()) return;
+    addItem.mutate(
+      { shopId: shop.id, input: { name: newItem.trim() } },
+      { onSuccess: () => setNewItem("") },
+    );
+  };
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -97,53 +152,91 @@ function ShopEditor({ shop, campaignId, onDelete }: EditorProps) {
         />
         <InlineConfirm onConfirm={onDelete} title="Delete shop" />
       </header>
-      <textarea
-        className="input mx-2 mt-2 min-h-[40px] text-xs"
-        placeholder="Shop notes"
-        defaultValue={shop.notes ?? ""}
-        onBlur={(e) =>
-          updateShop.mutate({ id: shop.id, input: { notes: e.target.value || undefined } })
-        }
-      />
+
+      <div className="flex items-center justify-between gap-2 border-b border-ink-800 px-2 py-1 text-xs text-ink-400">
+        <span>{shop.items.length} items</span>
+        <span>
+          stock value ≈ <span className="font-medium text-ink-200">{fmtPrice(totalValue)}</span>
+        </span>
+      </div>
+
+      <div className="px-2 pt-2">
+        <div className="mb-1 flex items-center gap-2">
+          <span className="text-[10px] uppercase tracking-wide text-ink-500">Notes</span>
+          {shop.notes && (
+            <button
+              className="ml-auto text-[10px] text-ink-500 hover:text-ink-200"
+              onClick={() => setNotesPreview((v) => !v)}
+            >
+              {notesPreview ? "edit" : "preview"}
+            </button>
+          )}
+        </div>
+        {notesPreview && shop.notes ? (
+          <div
+            className="rounded-md border border-ink-700 bg-ink-900/40 p-2"
+            onDoubleClick={() => setNotesPreview(false)}
+          >
+            <Markdown>{shop.notes}</Markdown>
+          </div>
+        ) : (
+          <textarea
+            className="input min-h-[40px] w-full text-xs"
+            placeholder="Shop notes (markdown) — keeper, location, rumors…"
+            defaultValue={shop.notes ?? ""}
+            onBlur={(e) => {
+              updateShop.mutate({ id: shop.id, input: { notes: e.target.value || undefined } });
+              if (e.target.value) setNotesPreview(true);
+            }}
+          />
+        )}
+      </div>
+
+      {shop.items.length > 3 && (
+        <input
+          className="input mx-2 mt-2 text-xs"
+          placeholder="Filter items…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+      )}
+
       <ul className="flex-1 space-y-1 overflow-auto p-2 text-sm">
-        {shop.items.map((it) => (
+        {items.map((it) => (
           <Row
             key={it.id}
             item={it}
-            onChange={(input) =>
-              updateItem.mutate({ shopId: shop.id, id: it.id, input })
-            }
-            onRemove={() => removeItem.mutate({ shopId: shop.id, id: it.id })}
+            onChange={(input) => updateItem.mutate({ shopId: shop.id, id: it.id, input })}
+            onAdjustStock={(delta) => adjustStock(it, delta)}
+            onRemove={() => handleRemoveItem(it)}
           />
         ))}
         {shop.items.length === 0 && (
-          <li className="text-ink-400">Empty stock — add or generate items.</li>
+          <li className="px-2 py-6">
+            <EmptyState
+              icon="📦"
+              title="Empty stock"
+              description="Add an item below, or delete this shop and generate a stocked one."
+            />
+          </li>
+        )}
+        {shop.items.length > 0 && items.length === 0 && (
+          <li className="py-4 text-center text-xs text-ink-500">No items match the filter.</li>
         )}
       </ul>
+
       <div className="flex items-center gap-1 border-t border-ink-700 p-2">
         <input
           className="input flex-1"
           placeholder="Add item by name"
           value={newItem}
           onChange={(e) => setNewItem(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && newItem.trim()) {
-              addItem.mutate(
-                { shopId: shop.id, input: { name: newItem.trim() } },
-                { onSuccess: () => setNewItem("") },
-              );
-            }
-          }}
+          onKeyDown={(e) => e.key === "Enter" && submitNewItem()}
         />
         <button
           className="btn-primary px-2"
           disabled={!newItem.trim() || addItem.isPending}
-          onClick={() =>
-            addItem.mutate(
-              { shopId: shop.id, input: { name: newItem.trim() } },
-              { onSuccess: () => setNewItem("") },
-            )
-          }
+          onClick={submitNewItem}
         >
           +
         </button>
@@ -155,48 +248,73 @@ function ShopEditor({ shop, campaignId, onDelete }: EditorProps) {
 interface RowProps {
   item: ShopItem;
   onChange: (input: Parameters<ReturnType<typeof useUpdateShopItem>["mutate"]>[0]["input"]) => void;
+  onAdjustStock: (delta: number) => void;
   onRemove: () => void;
 }
 
-function Row({ item, onChange, onRemove }: RowProps) {
+function Row({ item, onChange, onAdjustStock, onRemove }: RowProps) {
   return (
-    <li className="grid grid-cols-12 items-center gap-1 rounded-md border border-ink-700 bg-ink-900 px-2 py-1.5">
+    <li
+      className={clsx(
+        "flex flex-wrap items-center gap-1 rounded-md border border-l-2 border-ink-700 bg-ink-900 px-2 py-1.5",
+        rarityColor(item.rarity).split(" ")[0],
+      )}
+    >
       <input
-        className="input col-span-4"
+        className="input min-w-[8rem] flex-1"
         value={item.name}
         onChange={(e) => onChange({ name: e.target.value })}
       />
       <input
-        className="input col-span-2"
+        list="shop-item-types"
+        className="input w-24"
         placeholder="Type"
         value={item.type ?? ""}
         onChange={(e) => onChange({ type: e.target.value || undefined })}
       />
       <input
-        className="input col-span-2"
+        list="shop-item-rarities"
+        className={clsx("input w-28", rarityColor(item.rarity).split(" ")[1])}
         placeholder="Rarity"
         value={item.rarity ?? ""}
         onChange={(e) => onChange({ rarity: e.target.value || undefined })}
       />
       <input
         type="number"
-        className="input col-span-2 text-right"
+        className="input w-20 text-right"
         placeholder="Price"
         value={item.price ?? ""}
         onChange={(e) =>
           onChange({ price: e.target.value === "" ? undefined : Number(e.target.value) })
         }
       />
-      <input
-        type="number"
-        className="input col-span-1 text-right"
-        placeholder="#"
-        value={item.stock ?? ""}
-        onChange={(e) =>
-          onChange({ stock: e.target.value === "" ? undefined : Number(e.target.value) })
-        }
-      />
-      <button className="btn-ghost col-span-1 px-2" onClick={onRemove}>
+      <div className="flex items-center">
+        <button
+          className="btn-ghost h-7 px-1.5"
+          onClick={() => onAdjustStock(-1)}
+          disabled={(item.stock ?? 0) <= 0}
+          title="Sell one"
+        >
+          −
+        </button>
+        <input
+          type="number"
+          className="input w-12 px-1 text-center"
+          placeholder="#"
+          value={item.stock ?? ""}
+          onChange={(e) =>
+            onChange({ stock: e.target.value === "" ? undefined : Number(e.target.value) })
+          }
+        />
+        <button
+          className="btn-ghost h-7 px-1.5"
+          onClick={() => onAdjustStock(1)}
+          title="Restock one"
+        >
+          +
+        </button>
+      </div>
+      <button className="btn-ghost px-2 text-ink-500 hover:text-red-400" onClick={onRemove} title="Remove item">
         ×
       </button>
     </li>
@@ -210,7 +328,9 @@ interface GeneratorProps {
 
 function Generator({ campaignId, onCreated }: GeneratorProps) {
   const generate = useGenerateShop(campaignId);
-  const [params, setParams] = useState<GenerateShopInput>({
+  const toast = useToast();
+  const [name, setName] = useState("");
+  const [params, setParams] = useState<Omit<GenerateShopInput, "name">>({
     flavor: "general",
     size: "medium",
     rarityCap: "rare",
@@ -219,6 +339,12 @@ function Generator({ campaignId, onCreated }: GeneratorProps) {
   return (
     <div className="flex flex-1 flex-col items-stretch gap-2 p-4 text-sm">
       <p className="text-ink-400">No shop selected. Create one above, or generate:</p>
+      <input
+        className="input"
+        placeholder="Shop name (optional)"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
       <div className="grid grid-cols-2 gap-1.5">
         <select
           className="input"
@@ -248,10 +374,7 @@ function Generator({ campaignId, onCreated }: GeneratorProps) {
           className="input col-span-2"
           value={params.rarityCap}
           onChange={(e) =>
-            setParams({
-              ...params,
-              rarityCap: e.target.value as GenerateShopInput["rarityCap"],
-            })
+            setParams({ ...params, rarityCap: e.target.value as GenerateShopInput["rarityCap"] })
           }
         >
           <option value="common">Cap: common</option>
@@ -263,10 +386,20 @@ function Generator({ campaignId, onCreated }: GeneratorProps) {
       </div>
       <button
         className="btn-primary"
-        onClick={() => generate.mutate(params, { onSuccess: (s) => onCreated(s.id) })}
+        onClick={() =>
+          generate.mutate(
+            { ...params, name: name.trim() || undefined },
+            {
+              onSuccess: (s) => {
+                toast(`Generated ${s.items.length} items`, "success");
+                onCreated(s.id);
+              },
+            },
+          )
+        }
         disabled={generate.isPending}
       >
-        Generate
+        {generate.isPending ? "Generating…" : "Generate"}
       </button>
     </div>
   );

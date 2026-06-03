@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { Monster } from "@toolkit/shared";
+import { sampleMonsters, type Monster } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { InlineConfirm } from "../shared.js";
 import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
@@ -64,14 +64,26 @@ function BestiaryWidget({ campaignId }: WidgetContext) {
 
       <div className="flex items-center justify-between border-b border-ink-700 px-2 py-1.5 text-xs text-ink-400">
         <span>{list.data?.length ?? 0} creatures</span>
-        <button
-          className="btn-primary px-2"
-          onClick={() =>
-            create.mutate({ name: "New creature", campaignId, tags: [] })
-          }
-        >
-          + Add
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            className="btn-ghost px-2"
+            disabled={create.isPending}
+            title="Add the SRD sample creatures to this campaign"
+            onClick={() => {
+              for (const m of sampleMonsters) create.mutate({ ...m, campaignId });
+            }}
+          >
+            Load samples
+          </button>
+          <button
+            className="btn-primary px-2"
+            onClick={() =>
+              create.mutate({ name: "New creature", campaignId, tags: [] })
+            }
+          >
+            + Add
+          </button>
+        </div>
       </div>
 
       <ul className="flex-1 space-y-1 overflow-auto p-2 text-sm">

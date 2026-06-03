@@ -52,11 +52,13 @@ export function StatBlockView({
   meta?: string | null;
   portraitUrl?: string | null;
 }) {
+  const crValue = stats.cr ?? cr ?? null;
   const topLine = [
+    stats.level != null ? `Level ${stats.level}` : null,
+    crValue ? `CR ${crValue}` : null,
     stats.ac != null ? `AC ${stats.ac}` : null,
     stats.hp != null ? `HP ${stats.hp}${stats.hpMax ? `/${stats.hpMax}` : ""}` : null,
     stats.speed ? `Speed ${stats.speed}` : null,
-    cr ? `CR ${cr}` : null,
   ]
     .filter(Boolean)
     .join("   ·   ");

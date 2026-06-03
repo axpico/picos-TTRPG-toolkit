@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
-import type { GeneratedNpc, NPC } from "@toolkit/shared";
+import { sampleNpcs, type GeneratedNpc, type NPC } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { InlineConfirm } from "../shared.js";
 import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
@@ -103,6 +103,16 @@ function LibraryTab({ campaignId }: { campaignId: string }) {
           />
           ★ Faves
         </label>
+        <button
+          className="btn-ghost px-2 text-xs"
+          disabled={create.isPending}
+          title="Add the SRD sample NPCs to this campaign"
+          onClick={() => {
+            for (const n of sampleNpcs) create.mutate({ ...n, campaignId });
+          }}
+        >
+          Samples
+        </button>
         <button
           className="btn-primary px-2"
           onClick={() => create.mutate({ name: "New NPC", campaignId, tags: [] })}

@@ -34,6 +34,10 @@ export const statBlock = z.object({
   ac: z.number().int().nullable().default(null),
   hp: z.number().int().nullable().default(null),
   hpMax: z.number().int().nullable().default(null),
+  // Character level (PCs/NPCs) and challenge rating (creatures). CR is a string
+  // so fractional ratings like "1/4" round-trip cleanly. Both are optional.
+  level: z.number().int().nullable().default(null),
+  cr: z.string().max(20).nullable().default(null),
   profBonus: z.number().int().nullable().default(null),
   speed: text,
   saves: text,

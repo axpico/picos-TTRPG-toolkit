@@ -24,10 +24,12 @@ export const logRoutes: FastifyPluginAsync = async (app) => {
     return rows.map(toLogDto);
   });
 
+  const exportQuery = z.object({ kind: z.string().min(1).optional() });
   app.get("/:id/log/export", async (req, reply) => {
     const { id } = params.parse(req.params);
+    const { kind } = exportQuery.parse(req.query);
     const rows = await prisma.logEntry.findMany({
-      where: { campaignId: id },
+      where: { campaignId: id, ...(kind ? { kind } : {}) },
       orderBy: { createdAt: "asc" },
     });
     const md = rows
