@@ -26,8 +26,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Copy env
-        run: cp .env.example .env
+      - name: Prepare env
+        shell: bash
+        run: |
+          if [ -f .env.example ]; then
+            cp .env.example .env
+          else
+            touch .env
+          fi
+
+          SESSION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))")
+
+          if grep -q '^SESSION_KEY=' .env; then
+            sed -i "s|^SESSION_KEY=.*|SESSION_KEY=\"$SESSION_KEY\"|" .env
+          else
+            echo "SESSION_KEY=\"$SESSION_KEY\"" >> .env
+          fi
 
       - name: Run migrations
         run: npm run migrate
