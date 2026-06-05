@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { sampleNpcs, type CreateNpcInput, type GeneratedNpc, type NPC } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
-import { InlineConfirm } from "../shared.js";
+import { InlineConfirm, ScopeToggle, SearchInput } from "../shared.js";
 import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
 import {
   useCreateNpc,
@@ -70,60 +70,60 @@ function LibraryTab({ campaignId }: { campaignId: string }) {
   const remove = useDeleteNpc();
   const create = useCreateNpc();
 
+  const count = list.data?.length ?? 0;
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex items-center gap-1 border-b border-ink-700 px-2 py-1.5">
-        <input
-          className="input flex-1"
-          placeholder="Search name / role / notes…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-        <select
-          className="input w-28"
-          value={scope}
-          onChange={(e) => setScope(e.target.value as "campaign" | "all")}
-        >
-          <option value="campaign">This campaign</option>
-          <option value="all">All</option>
-        </select>
-        <label
-          className={clsx(
-            "flex cursor-pointer items-center gap-1 rounded-md border px-2 py-1 text-xs select-none transition-colors",
-            onlyFavorites
-              ? "border-amber-600 bg-amber-700/30 text-amber-200"
-              : "border-ink-700 text-ink-400 hover:bg-ink-800",
-          )}
-          title="Show favorites only"
-        >
-          <input
-            type="checkbox"
-            className="sr-only"
-            checked={onlyFavorites}
-            onChange={(e) => setOnlyFavorites(e.target.checked)}
-          />
-          ★ Faves
-        </label>
-        <button
-          className="btn-ghost px-2 text-xs"
-          disabled={create.isPending}
-          title="Add the SRD sample NPCs to this campaign"
-          onClick={() => {
-            for (const n of sampleNpcs) create.mutate({ ...n, campaignId });
-          }}
-        >
-          Samples
-        </button>
-        <button
-          className="btn-primary px-2"
-          onClick={() => create.mutate({ name: "New NPC", campaignId, tags: [] })}
-          title="New NPC"
-        >
-          +
-        </button>
+      {/* Filter bar */}
+      <div className="space-y-2 border-b border-ink-700 p-2">
+        <div className="flex items-center gap-2">
+          <SearchInput value={q} onChange={setQ} placeholder="Search name / role / notes…" />
+          <ScopeToggle value={scope} onChange={setScope} />
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <label
+            className={clsx(
+              "flex cursor-pointer select-none items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors",
+              onlyFavorites
+                ? "border-amber-600 bg-amber-700/30 text-amber-200"
+                : "border-ink-700 text-ink-400 hover:bg-ink-800",
+            )}
+            title="Show favorites only"
+          >
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={onlyFavorites}
+              onChange={(e) => setOnlyFavorites(e.target.checked)}
+            />
+            ★ Faves
+          </label>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-ink-400">
+              {list.isLoading ? "Loading…" : `${count} ${count === 1 ? "NPC" : "NPCs"}`}
+            </span>
+            <button
+              className="btn-ghost h-7 px-2 text-xs"
+              disabled={create.isPending}
+              title="Add the SRD sample NPCs to this campaign"
+              onClick={() => {
+                for (const n of sampleNpcs) create.mutate({ ...n, campaignId });
+              }}
+            >
+              Samples
+            </button>
+            <button
+              className="btn-primary h-7 px-2.5 text-xs"
+              onClick={() => create.mutate({ name: "New NPC", campaignId, tags: [] })}
+              title="New NPC"
+            >
+              + Add
+            </button>
+          </div>
+        </div>
       </div>
 
-      <ul className="flex-1 space-y-1 overflow-auto p-2 text-sm">
+      <ul className="flex-1 space-y-1.5 overflow-auto p-2 text-sm">
         {list.data?.map((n) => (
           <NpcRow
             key={n.id}
@@ -134,8 +134,16 @@ function LibraryTab({ campaignId }: { campaignId: string }) {
             onCopy={(target) => create.mutate({ ...npcToCreateInput(n), campaignId: target })}
           />
         ))}
-        {list.data?.length === 0 && (
-          <li className="py-6 text-center text-ink-500">No NPCs match your filters.</li>
+        {!list.isLoading && count === 0 && (
+          <li className="flex flex-col items-center gap-1 py-10 text-center">
+            <span className="text-2xl opacity-40">🧑‍🤝‍🧑</span>
+            <span className="text-sm text-ink-400">No NPCs match your filters.</span>
+            <span className="text-xs text-ink-500">
+              Use <span className="text-ink-300">+ Add</span>, the{" "}
+              <span className="text-ink-300">Generator</span>, or{" "}
+              <span className="text-ink-300">Samples</span>.
+            </span>
+          </li>
         )}
       </ul>
     </div>
@@ -178,30 +186,35 @@ function NpcRow({ npc, campaignId, onChange, onDelete, onCopy }: NpcRowProps) {
   useEffect(() => setLocalName(npc.name), [npc.name]);
   useEffect(() => setLocalRole(npc.role ?? ""), [npc.role]);
 
+  const isLibrary = npc.campaignId == null;
+
   return (
-    <li className="rounded-md border border-ink-700 bg-ink-900">
+    <li className="overflow-hidden rounded-lg border border-ink-700 bg-ink-900 transition-colors hover:border-ink-600">
       <div className="flex items-center gap-1.5 px-2 py-1.5">
         <button
-          className="text-ink-500 hover:text-ink-200 shrink-0"
+          className="shrink-0 text-ink-500 transition-colors hover:text-ink-200"
           onClick={() => setOpen((v) => !v)}
           title={open ? "Collapse" : "Expand"}
         >
           {open ? "▾" : "▸"}
         </button>
-        {npc.campaignId == null && (
-          <span className="chip shrink-0 border-sky-700/60 text-sky-300" title="Shared library NPC">
+        {isLibrary && (
+          <span
+            className="chip shrink-0 border-sky-700/60 bg-sky-900/30 text-sky-300"
+            title="Shared library NPC"
+          >
             Lib
           </span>
         )}
         <input
-          className="input flex-1 font-medium"
+          className="min-w-0 flex-1 truncate rounded border border-transparent bg-transparent px-1.5 py-0.5 text-sm font-medium text-ink-50 transition-colors hover:border-ink-700 focus:border-accent-500 focus:bg-ink-950 focus:outline-none focus:ring-1 focus:ring-accent-500"
           value={localName}
           onChange={(e) => setLocalName(e.target.value)}
           onBlur={() => localName !== npc.name && onChange({ name: localName })}
           placeholder="Name"
         />
         <input
-          className="input w-28 text-xs text-ink-300"
+          className="w-24 shrink-0 truncate rounded border border-transparent bg-transparent px-1.5 py-0.5 text-xs text-ink-300 transition-colors hover:border-ink-700 focus:border-accent-500 focus:bg-ink-950 focus:text-ink-50 focus:outline-none focus:ring-1 focus:ring-accent-500"
           placeholder="Role"
           value={localRole}
           onChange={(e) => setLocalRole(e.target.value)}
@@ -219,27 +232,29 @@ function NpcRow({ npc, campaignId, onChange, onDelete, onCopy }: NpcRowProps) {
         >
           ★
         </button>
-        {npc.campaignId == null ? (
-          <button
-            className="btn-ghost px-2 text-xs"
-            onClick={() => onCopy(campaignId)}
-            title="Copy this library NPC into the current campaign"
-          >
-            → Campaign
+        <div className="flex shrink-0 items-center gap-0.5">
+          {isLibrary ? (
+            <button
+              className="btn-ghost h-7 gap-1 px-2 text-xs text-accent-500 hover:text-accent-400"
+              onClick={() => onCopy(campaignId)}
+              title="Copy this library NPC into the current campaign"
+            >
+              ↘ Import
+            </button>
+          ) : npc.campaignId === campaignId ? (
+            <button
+              className="btn-ghost h-7 gap-1 px-2 text-xs"
+              onClick={() => onCopy(undefined)}
+              title="Copy this NPC into the shared library"
+            >
+              ↗ Library
+            </button>
+          ) : null}
+          <button className="btn-ghost h-7 px-2 text-xs" onClick={() => setSheet(true)} title="Open stat sheet">
+            Sheet
           </button>
-        ) : npc.campaignId === campaignId ? (
-          <button
-            className="btn-ghost px-2 text-xs"
-            onClick={() => onCopy(undefined)}
-            title="Copy this NPC into the shared library"
-          >
-            → Library
-          </button>
-        ) : null}
-        <button className="btn-ghost px-2 text-xs" onClick={() => setSheet(true)} title="Open stat sheet">
-          Sheet
-        </button>
-        <InlineConfirm onConfirm={onDelete} title="Delete NPC" />
+          <InlineConfirm onConfirm={onDelete} title="Delete NPC" />
+        </div>
       </div>
 
       {/* Tag chips in collapsed view */}

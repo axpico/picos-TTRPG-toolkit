@@ -4,6 +4,7 @@ import type { RollTable, RollTableEntry, RollTableResult } from "@toolkit/shared
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { useToast } from "../../components/Toast.js";
 import { InlineConfirm } from "../shared.js";
+import { copyText } from "../../lib/clipboard.js";
 import { downloadJson, parseTablesImport, serializeTables } from "./io.js";
 import {
   useCreateTable,
@@ -65,10 +66,9 @@ function RollTablesWidget({ campaignId }: WidgetContext) {
 
   const copyLatest = async () => {
     if (!latest) return;
-    try {
-      await navigator.clipboard.writeText(latest.text);
+    if (await copyText(latest.text)) {
       toast("Copied result.", "success");
-    } catch {
+    } else {
       toast("Couldn't copy to clipboard.", "error");
     }
   };
@@ -86,10 +86,9 @@ function RollTablesWidget({ campaignId }: WidgetContext) {
       toast("No tables to export.", "info");
       return;
     }
-    try {
-      await navigator.clipboard.writeText(serializeTables(tables));
+    if (await copyText(serializeTables(tables))) {
       toast("Tables copied as JSON.", "success");
-    } catch {
+    } else {
       toast("Couldn't copy to clipboard.", "error");
     }
   };

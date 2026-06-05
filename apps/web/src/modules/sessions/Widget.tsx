@@ -6,6 +6,7 @@ import { EmptyState } from "../../components/EmptyState.js";
 import { Markdown } from "../../components/Markdown.js";
 import { useConfirm } from "../../components/ConfirmDialog.js";
 import { useToast } from "../../components/Toast.js";
+import { copyText } from "../../lib/clipboard.js";
 import {
   useCreateSession,
   useDeleteSession,
@@ -200,10 +201,9 @@ function SessionEditor({ session, saving, onChange, onDelete }: EditorProps) {
   }, [session.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const copyLink = async (href: string) => {
-    try {
-      await navigator.clipboard.writeText(href);
+    if (await copyText(href)) {
       toast("Link copied", "success");
-    } catch {
+    } else {
       toast("Copy failed", "error");
     }
   };

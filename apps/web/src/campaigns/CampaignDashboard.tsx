@@ -11,6 +11,7 @@ import { useBroadcast } from "../hooks/useBroadcast.js";
 import { ThemeControl } from "../theme/ThemePanel.js";
 import { useConfirm } from "../components/ConfirmDialog.js";
 import { useToast } from "../components/Toast.js";
+import { copyText } from "../lib/clipboard.js";
 import "../modules/register.js";
 
 function uid() {
@@ -87,10 +88,9 @@ export function CampaignDashboard() {
 
   const copyJoinCode = async () => {
     if (!c.joinCode) return;
-    try {
-      await navigator.clipboard.writeText(c.joinCode);
+    if (await copyText(c.joinCode)) {
       toast("Join code copied — share it with your players.", "success");
-    } catch {
+    } else {
       toast(`Join code: ${c.joinCode}`);
     }
   };
