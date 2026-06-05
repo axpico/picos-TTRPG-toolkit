@@ -125,7 +125,7 @@ export function InfiniteCanvas({ campaignId }: Props) {
           excluded: ["no-pan"],
           velocityDisabled: true,
         }}
-        wheel={{ step: 0.1, smoothStep: 0.005, excluded: ["no-pan"] }}
+        wheel={{ step: 0.02, smoothStep: 0.0006, excluded: ["no-pan"] }}
         doubleClick={{ disabled: true }}
         onTransformed={(_r, state) => {
           setViewport({ x: state.positionX, y: state.positionY, scale: state.scale });
