@@ -15,6 +15,9 @@ interface Props {
 export function Widget({ campaignId, item }: Props) {
   const patchItem = useCanvasStore((s) => s.patchItem);
   const removeItem = useCanvasStore((s) => s.removeItem);
+  // The widget lives inside the zoom/pan-scaled canvas, so react-rnd must divide
+  // pointer deltas by the current zoom to track the cursor 1:1.
+  const scale = useCanvasStore((s) => s.layout.viewport.scale);
 
   const def = getWidget(item.moduleType);
 
@@ -30,6 +33,7 @@ export function Widget({ campaignId, item }: Props) {
       <Rnd
         className="no-pan"
         dragHandleClassName={DRAG_HANDLE}
+        scale={scale}
         position={{ x: item.x, y: item.y }}
         size={{ width: item.w, height: item.h }}
         bounds="parent"
@@ -63,6 +67,7 @@ export function Widget({ campaignId, item }: Props) {
     <Rnd
       className="no-pan"
       dragHandleClassName={DRAG_HANDLE}
+      scale={scale}
       position={{ x: item.x, y: item.y }}
       size={{ width: item.w, height: item.h }}
       minWidth={220}

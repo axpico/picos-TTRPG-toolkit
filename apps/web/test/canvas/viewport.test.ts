@@ -80,6 +80,31 @@ describe("fitTransform", () => {
     expect(padded.scale).toBeLessThan(unpadded.scale);
   });
 
+  it("frames far-apart widgets inside the viewport (no minScale clamp)", () => {
+    // Two widgets spread across the canvas: the true fit scale is well below the
+    // interactive 0.25 minScale. Clamping up to 0.25 would push the widgets off
+    // screen (the regression). With a low minScale the whole bbox must fit.
+    const bounds = { minX: 0, minY: 0, maxX: 5300, maxY: 5400, w: 5300, h: 5400 };
+    const t = fitTransform(bounds, vw, vh, { padding: 80, minScale: 0.05, maxScale: 1 });
+    // Every corner of the bbox should land within the viewport.
+    for (const cx of [bounds.minX, bounds.maxX]) {
+      for (const cy of [bounds.minY, bounds.maxY]) {
+        const sx = t.x + t.scale * cx;
+        const sy = t.y + t.scale * cy;
+        expect(sx).toBeGreaterThanOrEqual(0);
+        expect(sx).toBeLessThanOrEqual(vw);
+        expect(sy).toBeGreaterThanOrEqual(0);
+        expect(sy).toBeLessThanOrEqual(vh);
+      }
+    }
+  });
+
+  it("does not magnify a small cluster past maxScale 1", () => {
+    const bounds = { minX: 100, minY: 100, maxX: 400, maxY: 500, w: 300, h: 400 };
+    const t = fitTransform(bounds, vw, vh, { minScale: 0.05, maxScale: 1 });
+    expect(t.scale).toBeLessThanOrEqual(1);
+  });
+
   it("does not produce Infinity/NaN for a zero-size bbox", () => {
     const bounds = { minX: 50, minY: 50, maxX: 50, maxY: 50, w: 0, h: 0 };
     const t = fitTransform(bounds, vw, vh, { minScale: 0.25, maxScale: 3 });

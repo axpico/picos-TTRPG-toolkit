@@ -22,9 +22,13 @@ export function InfiniteCanvas({ campaignId }: Props) {
     if (!api || !wrap) return;
     const bounds = itemsBounds(items);
     if (!bounds) return;
+    // Allow fit to zoom out far below the interactive minScale so widgets that
+    // are spread across the canvas still get framed (clamping up to 0.25 would
+    // center the empty middle of the bbox with the widgets off-screen). Cap at
+    // 1x so a small cluster is framed, not magnified past its natural size.
     const { x, y, scale } = fitTransform(bounds, wrap.clientWidth, wrap.clientHeight, {
-      minScale: 0.25,
-      maxScale: 3,
+      minScale: 0.05,
+      maxScale: 1,
     });
     api.setTransform(x, y, scale, 300, "easeOut");
   }, [items]);
@@ -111,7 +115,7 @@ export function InfiniteCanvas({ campaignId }: Props) {
 
       <TransformWrapper
         ref={ref}
-        minScale={0.25}
+        minScale={0.05}
         maxScale={3}
         limitToBounds={false}
         initialPositionX={viewport.x}
@@ -121,7 +125,7 @@ export function InfiniteCanvas({ campaignId }: Props) {
           excluded: ["no-pan"],
           velocityDisabled: true,
         }}
-        wheel={{ step: 0.1, smoothStep: 0.005 }}
+        wheel={{ step: 0.1, smoothStep: 0.005, excluded: ["no-pan"] }}
         doubleClick={{ disabled: true }}
         onTransformed={(_r, state) => {
           setViewport({ x: state.positionX, y: state.positionY, scale: state.scale });

@@ -55,25 +55,32 @@ export function CampaignDashboard() {
   const c = campaign.data!;
   const playerUrl = `${window.location.origin}/play/${c.id}`;
 
-  const dropOrigin = () => {
+  // Top-left position (in content coordinates) that centers a `w`×`h` widget on
+  // the visible canvas. The canvas fills `<main>` via react-zoom-pan-pinch's
+  // `.react-transform-wrapper`; we map its center to content space via the
+  // transform model `content = (screen - position) / scale`.
+  const centerOrigin = (w: number, h: number) => {
     const viewport = useCanvasStore.getState().layout.viewport;
-    return {
-      x: -viewport.x / viewport.scale + 80,
-      y: -viewport.y / viewport.scale + 80,
-    };
+    const wrap = document.querySelector(".react-transform-wrapper");
+    const vw = wrap?.clientWidth ?? window.innerWidth;
+    const vh = wrap?.clientHeight ?? window.innerHeight;
+    const cx = (vw / 2 - viewport.x) / viewport.scale;
+    const cy = (vh / 2 - viewport.y) / viewport.scale;
+    return { x: cx - w / 2, y: cy - h / 2 };
   };
 
   const addWidget = (type: string) => {
     const def = listWidgets().find((d) => d.type === type);
     if (!def) return;
-    const { x, y } = dropOrigin();
+    const { w, h } = def.defaultSize;
+    const { x, y } = centerOrigin(w, h);
     upsertItem({
       instanceId: uid(),
       moduleType: type,
       x,
       y,
-      w: def.defaultSize.w,
-      h: def.defaultSize.h,
+      w,
+      h,
       state: {},
     });
   };
