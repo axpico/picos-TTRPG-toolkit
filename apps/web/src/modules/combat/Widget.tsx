@@ -3,11 +3,13 @@ import clsx from "clsx";
 import type {
   Combatant,
   Encounter,
+  StatBlock,
   UpdateCombatantInput,
   UpdatePartyMemberInput,
 } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { HpBar, InlineConfirm } from "../shared.js";
+import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
 import { useParty, useUpdatePartyMember } from "../party/api.js";
 import { useNpcs } from "../npc/api.js";
 import { useMonsters } from "../bestiary/api.js";
@@ -205,6 +207,30 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
     syncToParty(combatant, input);
   };
 
+  // Find the library entity (party member / NPC / monster) a combatant was drawn
+  // from, by name, so we can show its character sheet. Returns null when nothing
+  // with a stat block matches.
+  const resolveSheet = (combatant: Combatant): SheetInfo | null => {
+    const name = combatant.name.trim().toLowerCase();
+    const byName = <T extends { name: string }>(items: T[] | undefined) =>
+      (items ?? []).find((x) => x.name.trim().toLowerCase() === name);
+    if (combatant.isPC) {
+      const m = byName(party.data);
+      if (m)
+        return {
+          title: m.name,
+          subtitle: m.playerName ? `Played by ${m.playerName}` : null,
+          cr: null,
+          stats: m.stats,
+        };
+    }
+    const n = byName(npcs.data);
+    if (n) return { title: n.name, subtitle: n.role, cr: null, stats: n.stats };
+    const mo = byName(monsters.data);
+    if (mo) return { title: mo.name, subtitle: mo.type, cr: mo.challenge, stats: mo.stats };
+    return null;
+  };
+
   const submitCombatant = () => {
     const name = draft.name.trim();
     const initiative = Number(draft.initiative);
@@ -345,6 +371,7 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
           <CombatantRow
             key={c.id}
             combatant={c}
+            sheet={resolveSheet(c)}
             isCurrent={idx === encounter.currentTurn && isActive}
             round={encounter.round}
             isDropTarget={overIndex === idx && dragIndex !== null && dragIndex !== idx}
@@ -440,8 +467,16 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
   );
 }
 
+interface SheetInfo {
+  title: string;
+  subtitle: string | null;
+  cr: string | null;
+  stats: StatBlock;
+}
+
 interface CombatantRowProps {
   combatant: Combatant;
+  sheet: SheetInfo | null;
   isCurrent: boolean;
   round: number;
   isDropTarget: boolean;
@@ -458,6 +493,7 @@ interface CombatantRowProps {
 
 function CombatantRow({
   combatant,
+  sheet,
   isCurrent,
   round,
   isDropTarget,
@@ -470,6 +506,7 @@ function CombatantRow({
   onRemove,
 }: CombatantRowProps) {
   const [expanded, setExpanded] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [localName, setLocalName] = useState(combatant.name);
   const [localInit, setLocalInit] = useState(combatant.initiative);
   const [localHp, setLocalHp] = useState(combatant.hp ?? 0);
@@ -592,6 +629,15 @@ function CombatantRow({
         >
           {combatant.defeated ? "Revive" : "💀"}
         </button>
+        {sheet && (
+          <button
+            className="btn-ghost h-6 shrink-0 px-1.5 text-xs"
+            onClick={() => setSheetOpen(true)}
+            title="Open character sheet"
+          >
+            Sheet
+          </button>
+        )}
         <button
           className="btn-ghost h-6 w-6 shrink-0 p-0 text-ink-500 hover:text-ink-200"
           onClick={() => setExpanded((v) => !v)}
@@ -705,6 +751,18 @@ function CombatantRow({
             }
           />
         </div>
+      )}
+
+      {sheet && sheetOpen && (
+        <CreatureSheetModal
+          open
+          readOnly
+          onClose={() => setSheetOpen(false)}
+          title={sheet.title}
+          subtitle={sheet.subtitle}
+          cr={sheet.cr}
+          stats={sheet.stats}
+        />
       )}
     </li>
   );
