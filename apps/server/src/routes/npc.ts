@@ -14,19 +14,25 @@ export const npcRoutes: FastifyPluginAsync = async (app) => {
   app.get("/", async (req) => {
     const q = listNpcsQuery.parse(req.query);
     const search = q.q?.trim();
-    const where: Prisma.NPCWhereInput = {
-      ...(q.campaignId ? { campaignId: q.campaignId } : {}),
-      ...(q.favorite ? { favorite: true } : {}),
-      ...(search
-        ? {
-            OR: [
-              { name: { contains: search } },
-              { role: { contains: search } },
-              { notes: { contains: search } },
-            ],
-          }
-        : {}),
-    };
+    const conditions: Prisma.NPCWhereInput[] = [];
+    if (q.campaignId) {
+      conditions.push(
+        q.includeGlobal
+          ? { OR: [{ campaignId: q.campaignId }, { campaignId: null }] }
+          : { campaignId: q.campaignId },
+      );
+    }
+    if (q.favorite) conditions.push({ favorite: true });
+    if (search) {
+      conditions.push({
+        OR: [
+          { name: { contains: search } },
+          { role: { contains: search } },
+          { notes: { contains: search } },
+        ],
+      });
+    }
+    const where: Prisma.NPCWhereInput = conditions.length ? { AND: conditions } : {};
     const rows = await prisma.nPC.findMany({
       where,
       orderBy: [{ favorite: "desc" }, { updatedAt: "desc" }],

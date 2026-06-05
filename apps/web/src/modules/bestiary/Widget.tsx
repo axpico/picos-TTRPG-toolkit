@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { sampleMonsters, type Monster } from "@toolkit/shared";
+import { sampleMonsters, type CreateMonsterInput, type Monster } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { InlineConfirm } from "../shared.js";
 import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
@@ -18,7 +18,8 @@ function BestiaryWidget({ campaignId }: WidgetContext) {
 
   const filters = useMemo(
     () => ({
-      ...(scope === "campaign" ? { campaignId } : {}),
+      campaignId,
+      ...(scope === "all" ? { includeGlobal: true } : {}),
       q: q.trim() || undefined,
       type: type.trim() || undefined,
       environment: environment.trim() || undefined,
@@ -91,8 +92,12 @@ function BestiaryWidget({ campaignId }: WidgetContext) {
           <MonsterRow
             key={m.id}
             monster={m}
+            campaignId={campaignId}
             onChange={(input) => update.mutate({ id: m.id, input })}
             onDelete={() => remove.mutate(m.id)}
+            onCopy={(target) =>
+              create.mutate({ ...monsterToCreateInput(m), campaignId: target })
+            }
           />
         ))}
         {list.data?.length === 0 && (
@@ -103,13 +108,29 @@ function BestiaryWidget({ campaignId }: WidgetContext) {
   );
 }
 
-interface RowProps {
-  monster: Monster;
-  onChange: (input: Parameters<ReturnType<typeof useUpdateMonster>["mutate"]>[0]["input"]) => void;
-  onDelete: () => void;
+/** Build a create payload from an existing creature, for copying between scopes. */
+function monsterToCreateInput(m: Monster): Omit<CreateMonsterInput, "campaignId"> {
+  return {
+    name: m.name,
+    type: m.type ?? undefined,
+    environment: m.environment ?? undefined,
+    challenge: m.challenge ?? undefined,
+    stats: m.stats,
+    notes: m.notes ?? undefined,
+    tags: m.tags,
+  };
 }
 
-function MonsterRow({ monster, onChange, onDelete }: RowProps) {
+interface RowProps {
+  monster: Monster;
+  campaignId: string;
+  onChange: (input: Parameters<ReturnType<typeof useUpdateMonster>["mutate"]>[0]["input"]) => void;
+  onDelete: () => void;
+  /** Copy this creature into the given scope (campaign id, or undefined for the global library). */
+  onCopy: (target: string | undefined) => void;
+}
+
+function MonsterRow({ monster, campaignId, onChange, onDelete, onCopy }: RowProps) {
   const [open, setOpen] = useState(false);
   const [sheet, setSheet] = useState(false);
   const [localName, setLocalName] = useState(monster.name);
@@ -136,6 +157,11 @@ function MonsterRow({ monster, onChange, onDelete }: RowProps) {
         >
           {open ? "▾" : "▸"}
         </button>
+        {monster.campaignId == null && (
+          <span className="chip shrink-0 border-sky-700/60 text-sky-300" title="Shared library creature">
+            Lib
+          </span>
+        )}
         <input
           className="input flex-1"
           value={localName}
@@ -162,6 +188,23 @@ function MonsterRow({ monster, onChange, onDelete }: RowProps) {
             onChange({ challenge: localChallenge || undefined })
           }
         />
+        {monster.campaignId == null ? (
+          <button
+            className="btn-ghost px-2 text-xs"
+            onClick={() => onCopy(campaignId)}
+            title="Copy this library creature into the current campaign"
+          >
+            → Campaign
+          </button>
+        ) : monster.campaignId === campaignId ? (
+          <button
+            className="btn-ghost px-2 text-xs"
+            onClick={() => onCopy(undefined)}
+            title="Copy this creature into the shared library"
+          >
+            → Library
+          </button>
+        ) : null}
         <button className="btn-ghost px-2 text-xs" onClick={() => setSheet(true)} title="Open stat sheet">
           Sheet
         </button>

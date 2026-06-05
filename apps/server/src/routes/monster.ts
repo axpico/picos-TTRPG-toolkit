@@ -12,20 +12,26 @@ export const monsterRoutes: FastifyPluginAsync = async (app) => {
   app.get("/", async (req) => {
     const q = listMonstersQuery.parse(req.query);
     const search = q.q?.trim();
-    const where: Prisma.MonsterWhereInput = {
-      ...(q.campaignId ? { campaignId: q.campaignId } : {}),
-      ...(q.type ? { type: q.type } : {}),
-      ...(q.environment ? { environment: q.environment } : {}),
-      ...(search
-        ? {
-            OR: [
-              { name: { contains: search } },
-              { type: { contains: search } },
-              { notes: { contains: search } },
-            ],
-          }
-        : {}),
-    };
+    const conditions: Prisma.MonsterWhereInput[] = [];
+    if (q.campaignId) {
+      conditions.push(
+        q.includeGlobal
+          ? { OR: [{ campaignId: q.campaignId }, { campaignId: null }] }
+          : { campaignId: q.campaignId },
+      );
+    }
+    if (q.type) conditions.push({ type: q.type });
+    if (q.environment) conditions.push({ environment: q.environment });
+    if (search) {
+      conditions.push({
+        OR: [
+          { name: { contains: search } },
+          { type: { contains: search } },
+          { notes: { contains: search } },
+        ],
+      });
+    }
+    const where: Prisma.MonsterWhereInput = conditions.length ? { AND: conditions } : {};
     const rows = await prisma.monster.findMany({
       where,
       orderBy: [{ updatedAt: "desc" }],

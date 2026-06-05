@@ -33,6 +33,10 @@ export type UpdateMonsterInput = z.infer<typeof updateMonsterInput>;
 
 export const listMonstersQuery = z.object({
   campaignId: z.string().optional(),
+  includeGlobal: z
+    .union([z.boolean(), z.enum(["true", "false"])])
+    .transform((v) => v === true || v === "true")
+    .optional(),
   q: z.string().max(200).optional(),
   tag: z.string().max(40).optional(),
   type: z.string().max(60).optional(),

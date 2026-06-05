@@ -10,6 +10,7 @@ import { api } from "../../api/client.js";
 
 interface NpcListFilters {
   campaignId?: string;
+  includeGlobal?: boolean;
   q?: string;
   tag?: string;
   favorite?: boolean;
@@ -21,6 +22,7 @@ const listKey = (f: NpcListFilters) => [...baseKey, "list", f] as const;
 function toQuery(f: NpcListFilters) {
   const sp = new URLSearchParams();
   if (f.campaignId) sp.set("campaignId", f.campaignId);
+  if (f.includeGlobal) sp.set("includeGlobal", "true");
   if (f.q) sp.set("q", f.q);
   if (f.tag) sp.set("tag", f.tag);
   if (f.favorite) sp.set("favorite", "true");

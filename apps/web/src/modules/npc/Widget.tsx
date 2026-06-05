@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
-import { sampleNpcs, type GeneratedNpc, type NPC } from "@toolkit/shared";
+import { sampleNpcs, type CreateNpcInput, type GeneratedNpc, type NPC } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { InlineConfirm } from "../shared.js";
 import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
@@ -58,7 +58,8 @@ function LibraryTab({ campaignId }: { campaignId: string }) {
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const filters = useMemo(
     () => ({
-      ...(scope === "campaign" ? { campaignId } : {}),
+      campaignId,
+      ...(scope === "all" ? { includeGlobal: true } : {}),
       q: q.trim() || undefined,
       favorite: onlyFavorites || undefined,
     }),
@@ -127,8 +128,10 @@ function LibraryTab({ campaignId }: { campaignId: string }) {
           <NpcRow
             key={n.id}
             npc={n}
+            campaignId={campaignId}
             onChange={(input) => update.mutate({ id: n.id, input })}
             onDelete={() => remove.mutate(n.id)}
+            onCopy={(target) => create.mutate({ ...npcToCreateInput(n), campaignId: target })}
           />
         ))}
         {list.data?.length === 0 && (
@@ -139,13 +142,34 @@ function LibraryTab({ campaignId }: { campaignId: string }) {
   );
 }
 
-interface NpcRowProps {
-  npc: NPC;
-  onChange: (input: Parameters<ReturnType<typeof useUpdateNpc>["mutate"]>[0]["input"]) => void;
-  onDelete: () => void;
+/**
+ * Build a create payload from an existing NPC, for copying between scopes.
+ * `locationId` is intentionally dropped — it is campaign-bound and would dangle.
+ */
+function npcToCreateInput(n: NPC): Omit<CreateNpcInput, "campaignId"> {
+  return {
+    name: n.name,
+    role: n.role ?? undefined,
+    quirk: n.quirk ?? undefined,
+    hook: n.hook ?? undefined,
+    notes: n.notes ?? undefined,
+    tags: n.tags,
+    portraitAssetId: n.portraitAssetId ?? undefined,
+    favorite: n.favorite,
+    stats: n.stats,
+  };
 }
 
-function NpcRow({ npc, onChange, onDelete }: NpcRowProps) {
+interface NpcRowProps {
+  npc: NPC;
+  campaignId: string;
+  onChange: (input: Parameters<ReturnType<typeof useUpdateNpc>["mutate"]>[0]["input"]) => void;
+  onDelete: () => void;
+  /** Copy this NPC into the given scope (campaign id, or undefined for the global library). */
+  onCopy: (target: string | undefined) => void;
+}
+
+function NpcRow({ npc, campaignId, onChange, onDelete, onCopy }: NpcRowProps) {
   const [open, setOpen] = useState(false);
   const [sheet, setSheet] = useState(false);
   const [localName, setLocalName] = useState(npc.name);
@@ -164,6 +188,11 @@ function NpcRow({ npc, onChange, onDelete }: NpcRowProps) {
         >
           {open ? "▾" : "▸"}
         </button>
+        {npc.campaignId == null && (
+          <span className="chip shrink-0 border-sky-700/60 text-sky-300" title="Shared library NPC">
+            Lib
+          </span>
+        )}
         <input
           className="input flex-1 font-medium"
           value={localName}
@@ -190,6 +219,23 @@ function NpcRow({ npc, onChange, onDelete }: NpcRowProps) {
         >
           ★
         </button>
+        {npc.campaignId == null ? (
+          <button
+            className="btn-ghost px-2 text-xs"
+            onClick={() => onCopy(campaignId)}
+            title="Copy this library NPC into the current campaign"
+          >
+            → Campaign
+          </button>
+        ) : npc.campaignId === campaignId ? (
+          <button
+            className="btn-ghost px-2 text-xs"
+            onClick={() => onCopy(undefined)}
+            title="Copy this NPC into the shared library"
+          >
+            → Library
+          </button>
+        ) : null}
         <button className="btn-ghost px-2 text-xs" onClick={() => setSheet(true)} title="Open stat sheet">
           Sheet
         </button>

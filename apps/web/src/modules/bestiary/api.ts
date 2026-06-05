@@ -4,6 +4,7 @@ import { api } from "../../api/client.js";
 
 interface Filters {
   campaignId?: string;
+  includeGlobal?: boolean;
   q?: string;
   tag?: string;
   type?: string;
@@ -16,6 +17,7 @@ const listKey = (f: Filters) => [...baseKey, "list", f] as const;
 function toQuery(f: Filters) {
   const sp = new URLSearchParams();
   if (f.campaignId) sp.set("campaignId", f.campaignId);
+  if (f.includeGlobal) sp.set("includeGlobal", "true");
   if (f.q) sp.set("q", f.q);
   if (f.tag) sp.set("tag", f.tag);
   if (f.type) sp.set("type", f.type);
