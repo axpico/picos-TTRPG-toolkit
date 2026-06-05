@@ -1,11 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import type { Combatant, Encounter } from "@toolkit/shared";
+import type {
+  Combatant,
+  Encounter,
+  UpdateCombatantInput,
+  UpdatePartyMemberInput,
+} from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { HpBar, InlineConfirm } from "../shared.js";
-import { useParty } from "../party/api.js";
+import { useParty, useUpdatePartyMember } from "../party/api.js";
 import { useNpcs } from "../npc/api.js";
 import { useMonsters } from "../bestiary/api.js";
+import { CONDITIONS } from "./conditions.js";
 import { combatantFromMonster, combatantFromNpc, combatantFromParty } from "./fromLibrary.js";
 import {
   useAddCombatant,
@@ -105,11 +111,19 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
   const addCombatant = useAddCombatant(campaignId);
   const updateCombatant = useUpdateCombatant(campaignId);
   const removeCombatant = useRemoveCombatant(campaignId);
+  const updatePartyMember = useUpdatePartyMember(campaignId);
   const party = useParty(campaignId);
   const npcs = useNpcs({ campaignId });
   const monsters = useMonsters({ campaignId });
   const [draft, setDraft] = useState({ name: "", initiative: "", isPC: false });
   const [pickSource, setPickSource] = useState<"" | "party" | "npc" | "bestiary">("");
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  const isActive = encounter.active;
+  const hasCombatants = encounter.combatants.length > 0;
 
   const pickOptions =
     pickSource === "party"
@@ -149,15 +163,46 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
     });
   };
 
-  const moveCombatant = (index: number, dir: -1 | 1) => {
-    const list = encounter.combatants;
-    const target = index + dir;
-    if (target < 0 || target >= list.length) return;
-    const a = list[index];
-    const b = list[target];
-    if (!a || !b) return;
-    updateCombatant.mutate({ encounterId: encounter.id, id: a.id, input: { order: b.order } });
-    updateCombatant.mutate({ encounterId: encounter.id, id: b.id, input: { order: a.order } });
+  // Move a combatant from one position to another, re-numbering `order` across
+  // the list so the new arrangement persists. Used by drag-to-reorder.
+  const reorder = (from: number, to: number) => {
+    if (from === to) return;
+    const arr = [...encounter.combatants];
+    const [moved] = arr.splice(from, 1);
+    if (!moved) return;
+    arr.splice(to, 0, moved);
+    arr.forEach((c, idx) => {
+      if (c.order !== idx) {
+        updateCombatant.mutate({ encounterId: encounter.id, id: c.id, input: { order: idx } });
+      }
+    });
+  };
+
+  const onDrop = (target: number) => {
+    if (dragIndex !== null) reorder(dragIndex, target);
+    setDragIndex(null);
+    setOverIndex(null);
+  };
+
+  // Mirror a PC combatant's HP changes back onto the matching party member so the
+  // Party Tracker stays in sync. Combatants pulled from the party share its name,
+  // so we match on name within this campaign — but only sync when exactly one
+  // party member matches, to avoid clobbering the wrong character.
+  const syncToParty = (combatant: Combatant, input: UpdateCombatantInput) => {
+    if (!combatant.isPC) return;
+    if (input.hp === undefined && input.hpMax === undefined) return;
+    const name = combatant.name.trim().toLowerCase();
+    const matches = (party.data ?? []).filter((m) => m.name.trim().toLowerCase() === name);
+    if (matches.length !== 1) return;
+    const patch: UpdatePartyMemberInput = {};
+    if (input.hp !== undefined) patch.hp = input.hp;
+    if (input.hpMax !== undefined) patch.hpMax = input.hpMax;
+    updatePartyMember.mutate({ id: matches[0]!.id, input: patch });
+  };
+
+  const changeCombatant = (combatant: Combatant, input: UpdateCombatantInput) => {
+    updateCombatant.mutate({ encounterId: encounter.id, id: combatant.id, input });
+    syncToParty(combatant, input);
   };
 
   const submitCombatant = () => {
@@ -170,11 +215,46 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
     );
   };
 
-  const isActive = encounter.active;
-  const hasCombatants = encounter.combatants.length > 0;
+  // Keyboard shortcuts, scoped to when the pointer is over this widget so multiple
+  // trackers on the canvas don't fight. Ignored while typing in a field.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!rootRef.current?.matches(":hover")) return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.tagName === "SELECT" ||
+          t.isContentEditable)
+      )
+        return;
+      if (!hasCombatants) return;
+      const k = e.key.toLowerCase();
+      if (k === "n" || e.key === "ArrowRight") {
+        e.preventDefault();
+        next.mutate(encounter.id);
+      } else if (k === "p" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        prev.mutate(encounter.id);
+      } else if (k === "r") {
+        e.preventDefault();
+        rollInit.mutate({ encounterId: encounter.id, onlyNpc: true });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [encounter.id, hasCombatants]);
+
+  const count = encounter.combatants.length;
+  const turnNumber = hasCombatants ? (encounter.currentTurn % count) + 1 : 0;
+  const currentName = hasCombatants
+    ? encounter.combatants[encounter.currentTurn % count]?.name ?? ""
+    : "";
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div ref={rootRef} className="flex flex-1 flex-col overflow-hidden">
       {/* Controls bar */}
       <div className="flex items-center gap-2 border-b border-ink-700 bg-ink-900/50 px-2 py-1.5 text-sm">
         <button
@@ -187,7 +267,7 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
           className="btn-ghost px-2 font-medium"
           disabled={!hasCombatants}
           onClick={() => prev.mutate(encounter.id)}
-          title="Back to previous turn"
+          title="Back to previous turn (P or ←)"
         >
           ← Prev
         </button>
@@ -198,7 +278,7 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
           )}
           disabled={!hasCombatants}
           onClick={() => next.mutate(encounter.id)}
-          title="Advance to next turn (N)"
+          title="Advance to next turn (N or →)"
         >
           Next turn →
         </button>
@@ -206,7 +286,7 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
           className="btn-ghost px-2 text-xs"
           disabled={!hasCombatants || rollInit.isPending}
           onClick={() => rollInit.mutate({ encounterId: encounter.id, onlyNpc: true })}
-          title="Roll 1d20 initiative for all non-PC combatants"
+          title="Roll 1d20 initiative for all non-PC combatants (R)"
         >
           🎲 Init (NPCs)
         </button>
@@ -218,20 +298,45 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
         >
           Sort
         </button>
-        <div className="ml-auto flex items-center gap-3 text-xs text-ink-400">
-          <span>
-            Round{" "}
-            <span className={clsx("font-mono font-bold", isActive ? "text-accent-500" : "text-ink-100")}>
-              {encounter.round}
-            </span>
-          </span>
-          <span>
-            {hasCombatants
-              ? `${(encounter.currentTurn % encounter.combatants.length) + 1}/${encounter.combatants.length}`
-              : "—"}
-          </span>
+        <div className="ml-auto">
           <InlineConfirm onConfirm={onDelete} title="Delete encounter" />
         </div>
+      </div>
+
+      {/* Round / turn status strip */}
+      <div className="flex items-center gap-3 border-b border-ink-700 bg-ink-950/40 px-2.5 py-1 text-xs">
+        <span className="flex items-center gap-1.5">
+          <span className="uppercase tracking-wide text-ink-500">Round</span>
+          <span
+            className={clsx(
+              "font-mono text-sm font-bold",
+              isActive ? "text-accent-500" : "text-ink-100",
+            )}
+          >
+            {encounter.round}
+          </span>
+        </span>
+        <span className="text-ink-700">·</span>
+        {hasCombatants ? (
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="text-ink-500">
+              Turn{" "}
+              <span className="font-mono text-ink-200">
+                {turnNumber}/{count}
+              </span>
+            </span>
+            {isActive && currentName && (
+              <>
+                <span className="text-ink-700">·</span>
+                <span className="truncate font-medium text-accent-400" title={currentName}>
+                  {currentName}
+                </span>
+              </>
+            )}
+          </span>
+        ) : (
+          <span className="text-ink-600">No combatants</span>
+        )}
       </div>
 
       {/* Combatant list */}
@@ -241,11 +346,18 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
             key={c.id}
             combatant={c}
             isCurrent={idx === encounter.currentTurn && isActive}
-            onChange={(input) =>
-              updateCombatant.mutate({ encounterId: encounter.id, id: c.id, input })
-            }
+            round={encounter.round}
+            isDropTarget={overIndex === idx && dragIndex !== null && dragIndex !== idx}
+            isDragging={dragIndex === idx}
+            onDragStart={() => setDragIndex(idx)}
+            onDragEnter={() => setOverIndex(idx)}
+            onDragEnd={() => {
+              setDragIndex(null);
+              setOverIndex(null);
+            }}
+            onDrop={() => onDrop(idx)}
+            onChange={(input) => changeCombatant(c, input)}
             onRemove={() => removeCombatant.mutate({ encounterId: encounter.id, id: c.id })}
-            onMove={(dir) => moveCombatant(idx, dir)}
           />
         ))}
         {!hasCombatants && (
@@ -268,28 +380,26 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
           <option value="npc">NPC</option>
           <option value="bestiary">Bestiary</option>
         </select>
-        <select
-          className="input flex-1"
-          value=""
-          disabled={!pickSource || pickOptions.length === 0}
-          onChange={(e) => {
-            addFromSource(e.target.value);
-            e.currentTarget.selectedIndex = 0;
-          }}
-        >
-          <option value="">
-            {!pickSource
-              ? "Pick a source first…"
-              : pickOptions.length === 0
-                ? "Nothing in this library"
-                : "Select to add…"}
-          </option>
-          {pickOptions.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.label}
+        {pickSource && (
+          <select
+            className="input flex-1"
+            value=""
+            disabled={pickOptions.length === 0}
+            onChange={(e) => {
+              addFromSource(e.target.value);
+              e.currentTarget.selectedIndex = 0;
+            }}
+          >
+            <option value="">
+              {pickOptions.length === 0 ? "Nothing in this library" : "Select to add…"}
             </option>
-          ))}
-        </select>
+            {pickOptions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Add combatant row */}
@@ -333,28 +443,58 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
 interface CombatantRowProps {
   combatant: Combatant;
   isCurrent: boolean;
+  round: number;
+  isDropTarget: boolean;
+  isDragging: boolean;
+  onDragStart: () => void;
+  onDragEnter: () => void;
+  onDragEnd: () => void;
+  onDrop: () => void;
   onChange: (
     input: Parameters<ReturnType<typeof useUpdateCombatant>["mutate"]>[0]["input"],
   ) => void;
   onRemove: () => void;
-  onMove: (dir: -1 | 1) => void;
 }
 
-function CombatantRow({ combatant, isCurrent, onChange, onRemove, onMove }: CombatantRowProps) {
+function CombatantRow({
+  combatant,
+  isCurrent,
+  round,
+  isDropTarget,
+  isDragging,
+  onDragStart,
+  onDragEnter,
+  onDragEnd,
+  onDrop,
+  onChange,
+  onRemove,
+}: CombatantRowProps) {
+  const [expanded, setExpanded] = useState(false);
   const [localName, setLocalName] = useState(combatant.name);
   const [localInit, setLocalInit] = useState(combatant.initiative);
   const [localHp, setLocalHp] = useState(combatant.hp ?? 0);
   const [localHpMax, setLocalHpMax] = useState(combatant.hpMax ?? 0);
   const [localAc, setLocalAc] = useState(combatant.ac ?? 0);
-  const [localConditions, setLocalConditions] = useState(combatant.conditions.join(", "));
   const [localNotes, setLocalNotes] = useState(combatant.notes ?? "");
   const [dmgInput, setDmgInput] = useState("");
 
+  const rowRef = useRef<HTMLLIElement>(null);
+
+  useEffect(() => setLocalName(combatant.name), [combatant.name]);
+  useEffect(() => setLocalInit(combatant.initiative), [combatant.initiative]);
   useEffect(() => setLocalHp(combatant.hp ?? 0), [combatant.hp]);
   useEffect(() => setLocalHpMax(combatant.hpMax ?? 0), [combatant.hpMax]);
   useEffect(() => setLocalAc(combatant.ac ?? 0), [combatant.ac]);
-  useEffect(() => setLocalConditions(combatant.conditions.join(", ")), [combatant.conditions]);
   useEffect(() => setLocalNotes(combatant.notes ?? ""), [combatant.notes]);
+
+  // Auto-expand and scroll the active combatant into view as turns advance.
+  useEffect(() => {
+    if (isCurrent) {
+      setExpanded(true);
+      rowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCurrent, round]);
 
   const applyDamage = (sign: 1 | -1) => {
     const n = Number(dmgInput);
@@ -371,41 +511,49 @@ function CombatantRow({ combatant, isCurrent, onChange, onRemove, onMove }: Comb
     onChange({ hp: next });
   };
 
+  const setConditions = (conditions: string[]) => onChange({ conditions });
+
   return (
     <li
+      ref={rowRef}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        onDragStart();
+      }}
+      onDragEnter={onDragEnter}
+      onDragOver={(e) => e.preventDefault()}
+      onDragEnd={onDragEnd}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDrop();
+      }}
       className={clsx(
-        "rounded-md border px-2 py-2 transition-colors",
-        combatant.defeated
-          ? "border-ink-800 bg-ink-950 opacity-60"
-          : isCurrent
-            ? "border-accent-500 bg-accent-500/10 shadow-[inset_3px_0_0_theme(colors.accent.500)]"
-            : "border-ink-700 bg-ink-900",
+        "rounded-md border px-2 py-1.5 transition-colors",
+        isDragging && "opacity-40",
+        isDropTarget && "border-accent-500 ring-1 ring-accent-500",
+        !isDropTarget &&
+          (combatant.defeated
+            ? "border-ink-800 bg-ink-950 opacity-60"
+            : isCurrent
+              ? "border-accent-500 bg-accent-500/10 shadow-[inset_3px_0_0_theme(colors.accent.500)]"
+              : "border-ink-700 bg-ink-900"),
       )}
     >
-      {/* Name + initiative + badges */}
+      {/* Compact header — enough to run a turn without expanding */}
       <div className="flex items-center gap-1.5">
+        <span
+          className="shrink-0 cursor-grab select-none px-0.5 text-ink-600 hover:text-ink-300 active:cursor-grabbing"
+          title="Drag to reorder"
+        >
+          ⠿
+        </span>
         {isCurrent && !combatant.defeated && (
-          <span className="text-xs font-bold text-accent-500 shrink-0">▶</span>
+          <span className="shrink-0 text-xs font-bold text-accent-500">▶</span>
         )}
-        <div className="flex shrink-0 flex-col">
-          <button
-            className="h-3 leading-none text-[10px] text-ink-500 hover:text-ink-200"
-            onClick={() => onMove(-1)}
-            title="Move up"
-          >
-            ▲
-          </button>
-          <button
-            className="h-3 leading-none text-[10px] text-ink-500 hover:text-ink-200"
-            onClick={() => onMove(1)}
-            title="Move down"
-          >
-            ▼
-          </button>
-        </div>
         <input
           type="number"
-          className="input w-14 text-center font-mono text-sm"
+          className="input w-12 shrink-0 px-1 text-center font-mono text-sm"
           value={localInit}
           onChange={(e) => setLocalInit(Number(e.target.value))}
           onBlur={() => localInit !== combatant.initiative && onChange({ initiative: localInit })}
@@ -413,7 +561,7 @@ function CombatantRow({ combatant, isCurrent, onChange, onRemove, onMove }: Comb
         />
         <input
           className={clsx(
-            "input flex-1",
+            "input min-w-0 flex-1",
             combatant.isPC && "font-medium text-sky-300",
             combatant.defeated && "line-through",
           )}
@@ -422,8 +570,16 @@ function CombatantRow({ combatant, isCurrent, onChange, onRemove, onMove }: Comb
           onBlur={() => localName !== combatant.name && onChange({ name: localName })}
         />
         {combatant.isPC && (
-          <span className="shrink-0 rounded-full bg-sky-800/60 px-2 py-0.5 text-xs text-sky-300">
+          <span className="shrink-0 rounded-full bg-sky-800/60 px-1.5 py-0.5 text-[10px] text-sky-300">
             PC
+          </span>
+        )}
+        {combatant.conditions.length > 0 && (
+          <span
+            className="shrink-0 rounded-full bg-amber-900/50 px-1.5 py-0.5 text-[10px] font-medium text-amber-300"
+            title={combatant.conditions.join(", ")}
+          >
+            {combatant.conditions.length} cond
           </span>
         )}
         <button
@@ -436,101 +592,219 @@ function CombatantRow({ combatant, isCurrent, onChange, onRemove, onMove }: Comb
         >
           {combatant.defeated ? "Revive" : "💀"}
         </button>
+        <button
+          className="btn-ghost h-6 w-6 shrink-0 p-0 text-ink-500 hover:text-ink-200"
+          onClick={() => setExpanded((v) => !v)}
+          title={expanded ? "Collapse" : "Expand"}
+        >
+          <span className={clsx("inline-block transition-transform", expanded && "rotate-90")}>
+            ▸
+          </span>
+        </button>
         <InlineConfirm onConfirm={onRemove} title="Remove combatant" />
       </div>
 
-      {/* HP row */}
-      <div className="mt-1.5 flex items-center gap-1">
-        <button className="btn-ghost h-6 w-6 p-0 text-base leading-none" onClick={() => stepHp(-1)} title="−1 HP">−</button>
-        <input
-          type="number"
-          className="input w-14 text-center font-mono text-xs"
-          value={localHp}
-          onChange={(e) => setLocalHp(Number(e.target.value))}
-          onBlur={() => localHp !== (combatant.hp ?? 0) && onChange({ hp: localHp })}
-          title="HP"
-        />
-        <span className="text-ink-600">/</span>
-        <input
-          type="number"
-          className="input w-14 text-center font-mono text-xs text-ink-400"
-          value={localHpMax}
-          onChange={(e) => setLocalHpMax(Number(e.target.value))}
-          onBlur={() => localHpMax !== (combatant.hpMax ?? 0) && onChange({ hpMax: localHpMax })}
-          title="Max HP"
-        />
-        {/* Quick damage input */}
-        <span className="ml-1 text-xs text-ink-600">dmg</span>
-        <input
-          type="number"
-          className="input w-14 text-center font-mono text-xs"
-          placeholder="0"
-          value={dmgInput}
-          onChange={(e) => setDmgInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") applyDamage(1);
-          }}
-          title="Enter damage amount, Enter to apply, + to heal"
-        />
-        <button
-          className="btn-ghost h-6 px-1.5 text-xs text-red-400 hover:text-red-300"
-          onClick={() => applyDamage(1)}
-          title="Apply damage"
-          disabled={!dmgInput}
-        >
-          Dmg
-        </button>
-        <button
-          className="btn-ghost h-6 px-1.5 text-xs text-emerald-400 hover:text-emerald-300"
-          onClick={() => applyDamage(-1)}
-          title="Heal"
-          disabled={!dmgInput}
-        >
-          Heal
-        </button>
-        <span className="ml-auto text-xs text-ink-600">AC</span>
-        <input
-          type="number"
-          className="input w-12 text-center font-mono text-xs"
-          value={localAc}
-          onChange={(e) => setLocalAc(Number(e.target.value))}
-          onBlur={() => localAc !== (combatant.ac ?? 0) && onChange({ ac: localAc })}
-          title="Armor Class"
-        />
-      </div>
+      {/* Compact HP bar with inline numbers — always visible when there's max HP */}
+      {(combatant.hpMax ?? 0) > 0 && (
+        <div className="mt-1 flex items-center gap-2">
+          <div className="flex-1">
+            <HpBar hp={combatant.hp} hpMax={combatant.hpMax} />
+          </div>
+          <span className="shrink-0 font-mono text-[10px] text-ink-400">
+            {combatant.hp ?? 0}/{combatant.hpMax ?? 0}
+          </span>
+        </div>
+      )}
 
-      {/* HP bar */}
-      <div className="mt-1">
-        <HpBar hp={combatant.hp} hpMax={combatant.hpMax} />
-      </div>
+      {/* Expanded body — full editing controls */}
+      {expanded && (
+        <div className="mt-2 space-y-1.5 border-t border-ink-800 pt-2">
+          {/* HP / damage / AC row */}
+          <div className="flex flex-wrap items-center gap-1">
+            <button
+              className="btn-ghost h-6 w-6 p-0 text-base leading-none"
+              onClick={() => stepHp(-1)}
+              title="−1 HP"
+            >
+              −
+            </button>
+            <input
+              type="number"
+              className="input w-14 text-center font-mono text-xs"
+              value={localHp}
+              onChange={(e) => setLocalHp(Number(e.target.value))}
+              onBlur={() => localHp !== (combatant.hp ?? 0) && onChange({ hp: localHp })}
+              title="HP"
+            />
+            <span className="text-ink-600">/</span>
+            <input
+              type="number"
+              className="input w-14 text-center font-mono text-xs text-ink-400"
+              value={localHpMax}
+              onChange={(e) => setLocalHpMax(Number(e.target.value))}
+              onBlur={() => localHpMax !== (combatant.hpMax ?? 0) && onChange({ hpMax: localHpMax })}
+              title="Max HP"
+            />
+            <button
+              className="btn-ghost h-6 w-6 p-0 text-base leading-none"
+              onClick={() => stepHp(1)}
+              title="+1 HP"
+            >
+              +
+            </button>
+            <span className="ml-1 text-xs text-ink-600">dmg</span>
+            <input
+              type="number"
+              className="input w-14 text-center font-mono text-xs"
+              placeholder="0"
+              value={dmgInput}
+              onChange={(e) => setDmgInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") applyDamage(1);
+              }}
+              title="Enter amount, Enter or Dmg to apply, Heal to restore"
+            />
+            <button
+              className="btn-ghost h-6 px-1.5 text-xs text-red-400 hover:text-red-300"
+              onClick={() => applyDamage(1)}
+              title="Apply damage"
+              disabled={!dmgInput}
+            >
+              Dmg
+            </button>
+            <button
+              className="btn-ghost h-6 px-1.5 text-xs text-emerald-400 hover:text-emerald-300"
+              onClick={() => applyDamage(-1)}
+              title="Heal"
+              disabled={!dmgInput}
+            >
+              Heal
+            </button>
+            <span className="ml-auto text-xs text-ink-600">AC</span>
+            <input
+              type="number"
+              className="input w-12 text-center font-mono text-xs"
+              value={localAc}
+              onChange={(e) => setLocalAc(Number(e.target.value))}
+              onBlur={() => localAc !== (combatant.ac ?? 0) && onChange({ ac: localAc })}
+              title="Armor Class"
+            />
+          </div>
 
-      {/* Conditions */}
-      <input
-        className="input mt-1.5 text-xs"
-        placeholder="Conditions (comma-separated)…"
-        value={localConditions}
-        onChange={(e) => setLocalConditions(e.target.value)}
-        onBlur={(e) =>
-          onChange({
-            conditions: e.target.value
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean),
-          })
-        }
-      />
+          {/* Conditions */}
+          <ConditionEditor conditions={combatant.conditions} onChange={setConditions} />
 
-      {/* GM notes */}
-      <input
-        className="input mt-1 text-xs text-ink-400"
-        placeholder="GM notes (hidden from players)…"
-        value={localNotes}
-        onChange={(e) => setLocalNotes(e.target.value)}
-        onBlur={() =>
-          localNotes !== (combatant.notes ?? "") && onChange({ notes: localNotes || undefined })
-        }
-      />
+          {/* GM notes */}
+          <input
+            className="input text-xs text-ink-400"
+            placeholder="GM notes (hidden from players)…"
+            value={localNotes}
+            onChange={(e) => setLocalNotes(e.target.value)}
+            onBlur={() =>
+              localNotes !== (combatant.notes ?? "") && onChange({ notes: localNotes || undefined })
+            }
+          />
+        </div>
+      )}
     </li>
+  );
+}
+
+/**
+ * Condition editor: applied conditions render as removable chips, and a
+ * "＋ Condition" button opens a menu of the standard 5e conditions not yet
+ * applied, plus a free-text field for custom conditions.
+ */
+function ConditionEditor({
+  conditions,
+  onChange,
+}: {
+  conditions: string[];
+  onChange: (conditions: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [custom, setCustom] = useState("");
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const has = (name: string) => conditions.some((c) => c.toLowerCase() === name.toLowerCase());
+  const add = (name: string) => {
+    const n = name.trim();
+    if (!n || has(n)) return;
+    onChange([...conditions, n]);
+  };
+  const remove = (name: string) => onChange(conditions.filter((c) => c !== name));
+
+  const available = CONDITIONS.filter((c) => !has(c));
+
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {conditions.map((c) => (
+        <span
+          key={c}
+          className="inline-flex items-center gap-1 rounded-full border border-amber-700/40 bg-amber-900/40 px-2 py-0.5 text-[11px] text-amber-200"
+        >
+          {c}
+          <button
+            className="text-amber-400/70 hover:text-amber-200"
+            onClick={() => remove(c)}
+            title={`Remove ${c}`}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      <div ref={wrapRef} className="relative">
+        <button
+          className="btn-ghost h-6 rounded-full border border-dashed border-ink-600 px-2 text-[11px] text-ink-400 hover:text-ink-100"
+          onClick={() => setOpen((v) => !v)}
+          title="Add condition"
+        >
+          ＋ Condition
+        </button>
+        {open && (
+          <div className="absolute bottom-full left-0 z-20 mb-1 w-44 rounded-md border border-ink-700 bg-ink-850 p-1 shadow-lg">
+            <div className="max-h-40 overflow-auto">
+              {available.length === 0 ? (
+                <div className="px-2 py-1 text-[11px] text-ink-500">All standard conditions applied</div>
+              ) : (
+                available.map((c) => (
+                  <button
+                    key={c}
+                    className="block w-full rounded px-2 py-1 text-left text-xs text-ink-200 hover:bg-ink-800"
+                    onClick={() => add(c)}
+                  >
+                    {c}
+                  </button>
+                ))
+              )}
+            </div>
+            <div className="mt-1 border-t border-ink-700 pt-1">
+              <input
+                className="input text-xs"
+                placeholder="Custom…"
+                value={custom}
+                onChange={(e) => setCustom(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    add(custom);
+                    setCustom("");
+                  }
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
