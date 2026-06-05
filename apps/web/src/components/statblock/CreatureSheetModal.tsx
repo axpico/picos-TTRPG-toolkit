@@ -1,14 +1,21 @@
 import { useState, type ReactNode } from "react";
 import clsx from "clsx";
-import type { StatBlock } from "@toolkit/shared";
+import type { SheetKind, StatBlock } from "@toolkit/shared";
 import { Modal } from "../Modal.js";
-import { StatBlockView } from "./StatBlockView.js";
+import { RollableStatBlockView } from "./RollableStatBlockView.js";
 import { StatBlockEditor } from "./StatBlockEditor.js";
+import { StatBlockGenerator } from "./StatBlockGenerator.js";
+import { RollResultPopover } from "./RollResultPopover.js";
+import { useSheetRoll } from "./useSheetRoll.js";
 
 /**
  * A roomy modal "character sheet": a title/portrait header, a View/Edit toggle,
  * an optional `flavor` slot for entity-specific fields (type, role, notes…), and
  * the shared stat-block view/editor. Reused by Bestiary, NPC, Party, and tokens.
+ *
+ * When `campaignId` is provided, the view becomes interactive: abilities, saves,
+ * skills, attacks, initiative, and HP are clickable to roll dice — logged to the
+ * shared dice history, broadcast to players, and echoed in an inline popover.
  */
 export function CreatureSheetModal({
   open,
@@ -22,6 +29,9 @@ export function CreatureSheetModal({
   hideHp = false,
   readOnly = false,
   flavor,
+  campaignId,
+  rollerName,
+  kind = "npc",
 }: {
   open: boolean;
   onClose: () => void;
@@ -34,13 +44,21 @@ export function CreatureSheetModal({
   hideHp?: boolean;
   readOnly?: boolean;
   flavor?: ReactNode;
+  /** Enables rolling against the campaign's shared dice log. */
+  campaignId?: string;
+  /** Prefix shown on rolls made from this sheet (the creature's name). */
+  rollerName?: string;
+  /** Tunes the quick-generate power scale (level vs challenge rating). */
+  kind?: SheetKind;
 }) {
   const [mode, setMode] = useState<"view" | "edit">(readOnly ? "view" : "edit");
   const editing = mode === "edit" && !readOnly && Boolean(onChange);
+  const roll = useSheetRoll(campaignId);
+  const who = rollerName ?? title;
 
   return (
     <Modal open={open} onClose={onClose} className="max-w-3xl">
-      <div className="flex max-h-[85vh] flex-col">
+      <div className="relative flex max-h-[85vh] flex-col">
         {/* Header */}
         <header className="flex items-center gap-3 border-b border-ink-700 bg-ink-900/60 px-4 py-3">
           {portraitUrl && <img src={portraitUrl} alt="" className="h-10 w-10 rounded-md object-cover" />}
@@ -73,11 +91,24 @@ export function CreatureSheetModal({
         <div className="flex-1 overflow-auto p-4">
           {flavor && <div className="mb-4">{flavor}</div>}
           {editing && onChange ? (
-            <StatBlockEditor value={stats} onChange={onChange} hideHp={hideHp} />
+            <div className="space-y-4">
+              <StatBlockGenerator kind={kind} onGenerate={onChange} />
+              <StatBlockEditor value={stats} onChange={onChange} hideHp={hideHp} />
+            </div>
           ) : (
-            <StatBlockView stats={stats} cr={cr} meta={subtitle} portraitUrl={portraitUrl} />
+            <RollableStatBlockView
+              stats={stats}
+              who={who}
+              cr={cr}
+              meta={subtitle}
+              portraitUrl={portraitUrl}
+              onRoll={roll.enabled ? roll.trigger : undefined}
+            />
           )}
         </div>
+
+        {/* Inline roll result */}
+        <RollResultPopover roll={roll.last} onClose={roll.clear} onReroll={roll.trigger} />
       </div>
     </Modal>
   );

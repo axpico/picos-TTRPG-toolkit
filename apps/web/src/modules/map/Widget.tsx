@@ -1339,6 +1339,8 @@ function TokenPanel({
           title={sheetToken.label || "Token"}
           subtitle="Token stat block"
           portraitUrl={sheetToken.imageUrl}
+          campaignId={campaignId}
+          rollerName={sheetToken.label || "Token"}
           stats={sheetToken.statBlock ?? emptyStatBlock()}
           hideHp
           onChange={(next) => updateToken(sheetToken.id, { statBlock: next, ac: next.ac })}

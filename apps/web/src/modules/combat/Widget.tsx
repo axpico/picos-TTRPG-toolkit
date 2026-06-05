@@ -370,6 +370,7 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
         {encounter.combatants.map((c, idx) => (
           <CombatantRow
             key={c.id}
+            campaignId={campaignId}
             combatant={c}
             sheet={resolveSheet(c)}
             isCurrent={idx === encounter.currentTurn && isActive}
@@ -475,6 +476,7 @@ interface SheetInfo {
 }
 
 interface CombatantRowProps {
+  campaignId: string;
   combatant: Combatant;
   sheet: SheetInfo | null;
   isCurrent: boolean;
@@ -492,6 +494,7 @@ interface CombatantRowProps {
 }
 
 function CombatantRow({
+  campaignId,
   combatant,
   sheet,
   isCurrent,
@@ -761,6 +764,8 @@ function CombatantRow({
           title={sheet.title}
           subtitle={sheet.subtitle}
           cr={sheet.cr}
+          campaignId={campaignId}
+          rollerName={sheet.title}
           stats={sheet.stats}
         />
       )}

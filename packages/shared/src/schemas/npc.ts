@@ -37,11 +37,20 @@ export type CreateNpcInput = z.infer<typeof createNpcInput>;
 export const updateNpcInput = createNpcInput.partial();
 export type UpdateNpcInput = z.infer<typeof updateNpcInput>;
 
+export const archetypeEnum = z.enum(["brute", "skirmisher", "caster", "leader", "lurker"]);
+export type ArchetypeName = z.infer<typeof archetypeEnum>;
+
 export const generateNpcInput = z.object({
   culture: z.string().max(60).optional(),
   region: z.string().max(60).optional(),
   role: z.string().max(60).optional(),
   count: z.number().int().min(1).max(20).optional(),
+  /** When true, also generate a deterministic stat block for each NPC. */
+  withStats: z.boolean().optional(),
+  /** Character level used to size the generated stat block (defaults to 1). */
+  level: z.number().int().min(1).max(20).optional(),
+  /** Archetype controlling ability spread + stock attack (defaults to "leader"). */
+  archetype: archetypeEnum.optional(),
 });
 export type GenerateNpcInput = z.infer<typeof generateNpcInput>;
 
@@ -51,6 +60,7 @@ export const generatedNpc = z.object({
   quirk: z.string(),
   hook: z.string(),
   tags: z.array(z.string()),
+  stats: statBlock.optional(),
 });
 export type GeneratedNpc = z.infer<typeof generatedNpc>;
 

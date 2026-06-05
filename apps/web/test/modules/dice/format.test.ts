@@ -29,6 +29,19 @@ describe("parseBreakdown", () => {
     expect(parseBreakdown(json)).toBe("1d8 [6=6] +3");
   });
 
+  it("renders an advantage keep summary, marking the kept total", () => {
+    const json = JSON.stringify([
+      { kind: "keep", mode: "adv", totals: [11, 18], kept: 18 },
+      { kind: "roll", count: 1, sides: 20, rolls: [18] },
+    ]);
+    expect(parseBreakdown(json)).toBe("adv ⟨11 / *18*⟩ → 1d20 [18=18]");
+  });
+
+  it("renders a disadvantage keep summary", () => {
+    const json = JSON.stringify([{ kind: "keep", mode: "dis", totals: [7, 3], kept: 3 }]);
+    expect(parseBreakdown(json)).toBe("dis ⟨7 / *3*⟩ →");
+  });
+
   it("returns the raw string on malformed JSON", () => {
     expect(parseBreakdown("not json")).toBe("not json");
   });

@@ -1,5 +1,13 @@
 import { useMemo, useState } from "react";
-import { sampleMonsters, type CreateMonsterInput, type Monster } from "@toolkit/shared";
+import clsx from "clsx";
+import {
+  ARCHETYPES,
+  buildStatBlock,
+  sampleMonsters,
+  type Archetype,
+  type CreateMonsterInput,
+  type Monster,
+} from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { InlineConfirm, MetaChip, ScopeToggle, SearchInput } from "../shared.js";
 import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
@@ -10,7 +18,37 @@ import {
   useUpdateMonster,
 } from "./api.js";
 
-function BestiaryWidget({ campaignId }: WidgetContext) {
+type Tab = "library" | "generator";
+
+function BestiaryWidget({ campaignId, state, setState }: WidgetContext) {
+  const tab = (state?.tab as Tab | undefined) ?? "library";
+  const setTab = (t: Tab) => setState({ tab: t });
+  return (
+    <div className="flex h-full flex-col">
+      <nav className="flex gap-1 border-b border-ink-700 px-2 py-1.5 text-sm">
+        <button
+          className={clsx("btn px-3", tab === "library" ? "btn-primary" : "btn-ghost")}
+          onClick={() => setTab("library")}
+        >
+          Library
+        </button>
+        <button
+          className={clsx("btn px-3", tab === "generator" ? "btn-primary" : "btn-ghost")}
+          onClick={() => setTab("generator")}
+        >
+          Generator
+        </button>
+      </nav>
+      {tab === "library" ? (
+        <LibraryTab campaignId={campaignId} />
+      ) : (
+        <GeneratorTab campaignId={campaignId} />
+      )}
+    </div>
+  );
+}
+
+function LibraryTab({ campaignId }: { campaignId: string }) {
   const [q, setQ] = useState("");
   const [scope, setScope] = useState<"campaign" | "all">("campaign");
   const [type, setType] = useState("");
@@ -35,7 +73,7 @@ function BestiaryWidget({ campaignId }: WidgetContext) {
   const count = list.data?.length ?? 0;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-1 flex-col overflow-hidden">
       {/* Filter bar */}
       <div className="space-y-2 border-b border-ink-700 p-2">
         <div className="flex items-center gap-2">
@@ -279,6 +317,9 @@ function MonsterRow({ monster, campaignId, onChange, onDelete, onCopy }: RowProp
           title={monster.name}
           subtitle={[monster.type, monster.environment].filter(Boolean).join(" · ") || null}
           cr={monster.challenge}
+          campaignId={campaignId}
+          rollerName={monster.name}
+          kind="beast"
           stats={monster.stats}
           onChange={(next) => onChange({ stats: next })}
         />
@@ -320,6 +361,111 @@ function CopyButton({
       </button>
     );
   return null;
+}
+
+// A few generic, ownable creature name parts to flavor generated beasts.
+const BEAST_PREFIX = ["Gloom", "Ash", "Bone", "Mire", "Frost", "Iron", "Thorn", "Dusk", "Storm", "Rot"];
+const BEAST_BASE = ["stalker", "maw", "horror", "fiend", "drake", "hound", "warden", "crawler", "broodling", "wretch"];
+const BEAST_TYPES = ["beast", "aberration", "fiend", "undead", "monstrosity", "elemental", "fey"];
+
+function randItem<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)]!;
+}
+
+function GeneratorTab({ campaignId }: { campaignId: string }) {
+  const create = useCreateMonster();
+  const [cr, setCr] = useState("1");
+  const [archetype, setArchetype] = useState<Archetype>("brute");
+  const [type, setType] = useState("beast");
+  const [results, setResults] = useState<CreateMonsterInput[]>([]);
+  const [saved, setSaved] = useState<Set<number>>(new Set());
+
+  const roll = () => {
+    setSaved(new Set());
+    const next = Array.from({ length: 3 }, () => {
+      const name = `${randItem(BEAST_PREFIX)} ${randItem(BEAST_BASE)}`;
+      return {
+        name,
+        type,
+        challenge: cr.trim() || "1",
+        tags: [archetype],
+        stats: buildStatBlock({ kind: "beast", crOrLevel: cr.trim() || "1", archetype }),
+      } satisfies CreateMonsterInput;
+    });
+    setResults(next);
+  };
+
+  const save = (m: CreateMonsterInput, idx: number) => {
+    create.mutate(
+      { ...m, campaignId },
+      { onSuccess: () => setSaved((prev) => new Set(prev).add(idx)) },
+    );
+  };
+
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden p-3 text-sm">
+      <div className="grid grid-cols-3 gap-1.5">
+        <div>
+          <label className="mb-0.5 block text-xs text-ink-400">Challenge</label>
+          <input className="input" value={cr} placeholder="1/2" onChange={(e) => setCr(e.target.value)} />
+        </div>
+        <div>
+          <label className="mb-0.5 block text-xs text-ink-400">Archetype</label>
+          <select className="input" value={archetype} onChange={(e) => setArchetype(e.target.value as Archetype)}>
+            {ARCHETYPES.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-0.5 block text-xs text-ink-400">Type</label>
+          <select className="input" value={type} onChange={(e) => setType(e.target.value)}>
+            {BEAST_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <button className="btn-primary mt-2" onClick={roll}>
+        Roll creatures
+      </button>
+
+      <ul className="mt-3 flex-1 space-y-2 overflow-auto">
+        {results.map((m, idx) => (
+          <li
+            key={idx}
+            className={clsx(
+              "flex items-center justify-between gap-2 rounded-md border px-2 py-2",
+              saved.has(idx) ? "border-emerald-700/50 bg-emerald-900/10" : "border-ink-700 bg-ink-900",
+            )}
+          >
+            <div className="min-w-0">
+              <div className="truncate font-medium">{m.name}</div>
+              <div className="text-xs text-ink-400">
+                CR {m.challenge} · {m.type} · AC {m.stats?.ac} · HP {m.stats?.hp}
+              </div>
+            </div>
+            <button
+              className="btn-ghost h-6 shrink-0 px-2 text-xs"
+              onClick={() => save(m, idx)}
+              disabled={saved.has(idx)}
+            >
+              {saved.has(idx) ? "✓ Saved" : "Save"}
+            </button>
+          </li>
+        ))}
+        {results.length === 0 && (
+          <li className="flex h-full items-center justify-center py-8 text-center text-ink-500">
+            Pick a challenge rating and roll some creatures.
+          </li>
+        )}
+      </ul>
+    </div>
+  );
 }
 
 registerWidget({

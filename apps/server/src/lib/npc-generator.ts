@@ -1,4 +1,4 @@
-import type { GeneratedNpc } from "@toolkit/shared";
+import { buildStatBlock, type ArchetypeName, type GeneratedNpc } from "@toolkit/shared";
 
 // All tables are original phrasings. Names are intentionally generic
 // fantasy/sci-fi staples that nobody owns; cultures map to flavor packs.
@@ -106,6 +106,9 @@ export function generateNpc(opts: {
   region?: string;
   role?: string;
   seed?: string;
+  withStats?: boolean;
+  level?: number;
+  archetype?: ArchetypeName;
 }): GeneratedNpc {
   const rng = makeRng(opts.seed);
   const cultureKey = (opts.culture ?? "generic").toLowerCase();
@@ -118,11 +121,19 @@ export function generateNpc(opts: {
   const baseTags = [pick(rng, TAGS)];
   if (opts.region) baseTags.push(opts.region.toLowerCase());
   if (opts.culture) baseTags.push(opts.culture.toLowerCase());
-  return {
+  const npc: GeneratedNpc = {
     name: `${given} ${family}`,
     role,
     quirk,
     hook,
     tags: Array.from(new Set(baseTags)),
   };
+  if (opts.withStats) {
+    npc.stats = buildStatBlock({
+      kind: "npc",
+      crOrLevel: opts.level ?? 1,
+      archetype: opts.archetype ?? "leader",
+    });
+  }
+  return npc;
 }

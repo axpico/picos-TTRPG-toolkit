@@ -1,6 +1,7 @@
 export type BreakdownTerm =
   | { kind: "roll"; count: number; sides: number; rolls: number[] }
-  | { kind: "const"; value: number };
+  | { kind: "const"; value: number }
+  | { kind: "keep"; mode: "adv" | "dis"; totals: [number, number]; kept: number };
 
 /** Render a stored dice breakdown (JSON array of terms) as a human string. */
 export function parseBreakdown(json: string): string {
@@ -14,6 +15,10 @@ export function parseBreakdown(json: string): string {
         parts.push(`${t.count}d${t.sides} [${rollStr}=${sum}]`);
       } else if (t.kind === "const") {
         parts.push(t.value >= 0 ? `+${t.value}` : `${t.value}`);
+      } else if (t.kind === "keep") {
+        const [a, b] = t.totals;
+        const shown = [a, b].map((v) => (v === t.kept ? `*${v}*` : `${v}`)).join(" / ");
+        parts.push(`${t.mode === "adv" ? "adv" : "dis"} ⟨${shown}⟩ →`);
       }
     }
     return parts.join(" ").replace(/^\+/, "");

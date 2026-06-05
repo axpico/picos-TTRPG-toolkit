@@ -13,9 +13,9 @@ export function DicePanel({ campaignId }: { campaignId: string }) {
   const me = useMe();
   const myId = me.data?.user?.id;
 
-  const doRoll = () => {
+  const doRoll = (advantage?: "adv" | "dis") => {
     if (!notation.trim()) return;
-    roll.mutate({ notation: notation.trim() });
+    roll.mutate({ notation: notation.trim(), advantage });
   };
 
   const latest = history.data?.[0];
@@ -43,8 +43,26 @@ export function DicePanel({ campaignId }: { campaignId: string }) {
           placeholder="e.g. 2d6+3"
           spellCheck={false}
         />
-        <button className="btn-primary px-4 font-semibold" onClick={doRoll} disabled={roll.isPending || !notation.trim()}>
+        <button className="btn-primary px-4 font-semibold" onClick={() => doRoll()} disabled={roll.isPending || !notation.trim()}>
           Roll
+        </button>
+      </div>
+      <div className="mt-1 flex gap-1">
+        <button
+          className="btn-ghost h-7 flex-1 text-xs"
+          onClick={() => doRoll("adv")}
+          disabled={roll.isPending || !notation.trim()}
+          title="Roll twice, keep the higher total (advantage)"
+        >
+          Advantage
+        </button>
+        <button
+          className="btn-ghost h-7 flex-1 text-xs"
+          onClick={() => doRoll("dis")}
+          disabled={roll.isPending || !notation.trim()}
+          title="Roll twice, keep the lower total (disadvantage)"
+        >
+          Disadvantage
         </button>
       </div>
 

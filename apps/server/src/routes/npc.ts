@@ -113,7 +113,16 @@ export const npcRoutes: FastifyPluginAsync = async (app) => {
   app.post("/generate", async (req) => {
     const body = generateNpcInput.parse(req.body ?? {});
     const count = body.count ?? 1;
-    const npcs = Array.from({ length: count }, () => generateNpc(body));
+    const npcs = Array.from({ length: count }, () =>
+      generateNpc({
+        culture: body.culture,
+        region: body.region,
+        role: body.role,
+        withStats: body.withStats,
+        level: body.level,
+        archetype: body.archetype,
+      }),
+    );
     return { npcs };
   });
 };

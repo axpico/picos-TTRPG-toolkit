@@ -73,6 +73,7 @@ function PartyTrackerWidget({ campaignId }: WidgetContext) {
           <PartyMemberRow
             key={m.id}
             member={m}
+            campaignId={campaignId}
             onChange={(input) => update.mutate({ id: m.id, input })}
             onDelete={() => remove.mutate(m.id)}
           />
@@ -89,13 +90,14 @@ function PartyTrackerWidget({ campaignId }: WidgetContext) {
 
 interface PartyMemberRowProps {
   member: PartyMember;
+  campaignId: string;
   onChange: (
     input: Parameters<ReturnType<typeof useUpdatePartyMember>["mutate"]>[0]["input"],
   ) => void;
   onDelete: () => void;
 }
 
-function PartyMemberRow({ member, onChange, onDelete }: PartyMemberRowProps) {
+function PartyMemberRow({ member, campaignId, onChange, onDelete }: PartyMemberRowProps) {
   const [localName, setLocalName] = useState(member.name);
   const [localPlayer, setLocalPlayer] = useState(member.playerName ?? "");
   const [localHp, setLocalHp] = useState(member.hp ?? 0);
@@ -166,6 +168,9 @@ function PartyMemberRow({ member, onChange, onDelete }: PartyMemberRowProps) {
           onClose={() => setSheet(false)}
           title={member.name}
           subtitle={member.playerName ? `Played by ${member.playerName}` : null}
+          campaignId={campaignId}
+          rollerName={member.name}
+          kind="player"
           stats={member.stats}
           hideHp
           onChange={(next) => onChange({ stats: next })}

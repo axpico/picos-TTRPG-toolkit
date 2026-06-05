@@ -3,7 +3,12 @@
  * Returns breakdown as array of terms with individual rolls.
  */
 
-export type DiceTerm = { kind: "roll"; count: number; sides: number; rolls: number[] } | { kind: "const"; value: number };
+export type DiceTerm =
+  | { kind: "roll"; count: number; sides: number; rolls: number[] }
+  | { kind: "const"; value: number }
+  // A summary of an advantage/disadvantage roll: the two totals rolled and which
+  // was kept. Carries no value toward the total (the kept roll's own terms do).
+  | { kind: "keep"; mode: "adv" | "dis"; totals: [number, number]; kept: number };
 
 function randInt(rng: () => number, lo: number, hi: number) {
   return lo + Math.floor(rng() * (hi - lo + 1));
@@ -54,5 +59,14 @@ export function rollWithMode(notation: string, mode?: "adv" | "dis") {
   const keepHigher = mode === "adv";
   const keep =
     (keepHigher ? second.total > first.total : second.total < first.total) ? second : first;
-  return keep;
+  // Prepend a summary term so every UI that renders the breakdown can show that
+  // two rolls were made and which one was kept (otherwise adv/dis is invisible).
+  const summary: DiceTerm = {
+    kind: "keep",
+    mode,
+    totals: [first.total, second.total],
+    kept: keep.total,
+  };
+  const terms: DiceTerm[] = [summary, ...keep.terms];
+  return { notation, total: keep.total, terms, breakdownJson: JSON.stringify(terms) };
 }

@@ -324,6 +324,9 @@ function NpcRow({ npc, campaignId, onChange, onDelete, onCopy }: NpcRowProps) {
           onClose={() => setSheet(false)}
           title={npc.name}
           subtitle={npc.role}
+          campaignId={campaignId}
+          rollerName={npc.name}
+          kind="npc"
           stats={npc.stats}
           onChange={(next) => onChange({ stats: next })}
           flavor={
@@ -340,6 +343,8 @@ function NpcRow({ npc, campaignId, onChange, onDelete, onCopy }: NpcRowProps) {
   );
 }
 
+const ARCHETYPES = ["brute", "skirmisher", "caster", "leader", "lurker"] as const;
+
 function GeneratorTab({ campaignId }: { campaignId: string }) {
   const generate = useGenerateNpc();
   const create = useCreateNpc();
@@ -347,20 +352,29 @@ function GeneratorTab({ campaignId }: { campaignId: string }) {
   const [region, setRegion] = useState("");
   const [role, setRole] = useState("");
   const [count, setCount] = useState(3);
+  const [withStats, setWithStats] = useState(false);
+  const [level, setLevel] = useState(1);
+  const [archetype, setArchetype] = useState<(typeof ARCHETYPES)[number]>("leader");
   const [results, setResults] = useState<GeneratedNpc[]>([]);
   const [saved, setSaved] = useState<Set<number>>(new Set());
 
   const roll = () => {
     setSaved(new Set());
     generate.mutate(
-      { culture: culture || undefined, region: region || undefined, role: role || undefined, count },
+      {
+        culture: culture || undefined,
+        region: region || undefined,
+        role: role || undefined,
+        count,
+        ...(withStats ? { withStats: true, level, archetype } : {}),
+      },
       { onSuccess: (r) => setResults(r.npcs) },
     );
   };
 
   const save = (n: GeneratedNpc, idx: number) => {
     create.mutate(
-      { name: n.name, role: n.role, quirk: n.quirk, hook: n.hook, tags: n.tags, campaignId },
+      { name: n.name, role: n.role, quirk: n.quirk, hook: n.hook, tags: n.tags, stats: n.stats, campaignId },
       { onSuccess: () => setSaved((prev) => new Set(prev).add(idx)) },
     );
   };
@@ -412,6 +426,43 @@ function GeneratorTab({ campaignId }: { campaignId: string }) {
           />
         </div>
       </div>
+
+      <div className="mt-2 rounded-md border border-ink-700 bg-ink-900/50 p-2">
+        <label className="flex cursor-pointer select-none items-center gap-2 text-xs text-ink-300">
+          <input type="checkbox" checked={withStats} onChange={(e) => setWithStats(e.target.checked)} />
+          Also generate a stat block
+        </label>
+        {withStats && (
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
+            <div>
+              <label className="mb-0.5 block text-xs text-ink-400">Level</label>
+              <input
+                type="number"
+                className="input"
+                min={1}
+                max={20}
+                value={level}
+                onChange={(e) => setLevel(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+              />
+            </div>
+            <div>
+              <label className="mb-0.5 block text-xs text-ink-400">Archetype</label>
+              <select
+                className="input"
+                value={archetype}
+                onChange={(e) => setArchetype(e.target.value as (typeof ARCHETYPES)[number])}
+              >
+                {ARCHETYPES.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+      </div>
+
       <button
         className="btn-primary mt-2"
         onClick={roll}
@@ -456,6 +507,11 @@ function GeneratorTab({ campaignId }: { campaignId: string }) {
               </div>
             </div>
             <div className="flex flex-wrap gap-1">
+              {n.stats && (
+                <span className="chip border-accent-700/50 bg-accent-900/20 text-accent-200">
+                  ⚄ statblock
+                </span>
+              )}
               {n.tags.map((t) => (
                 <span key={t} className="chip">
                   {t}

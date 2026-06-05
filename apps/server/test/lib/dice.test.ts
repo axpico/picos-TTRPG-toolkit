@@ -39,6 +39,32 @@ test("rollWithMode advantage/disadvantage stay within a single die's range", () 
   }
 });
 
+test("advantage keeps the higher of two rolls, disadvantage the lower", () => {
+  const real = Math.random;
+  // Two successive rollNotation calls consume two randoms: a low then a high.
+  // randInt(1, 20) = 1 + floor(r * 20); r=0 → 1, r=0.95 → 20.
+  try {
+    const seq = (...vals: number[]) => {
+      let i = 0;
+      Math.random = () => vals[i++ % vals.length]!;
+    };
+
+    seq(0, 0.95); // first roll → 1, second roll → 20
+    const adv = rollWithMode("1d20", "adv");
+    assert.equal(adv.total, 20, "adv keeps the 20");
+    // The breakdown must record both totals and which was kept, so the UI can
+    // show that advantage actually happened.
+    assert.deepEqual(adv.terms[0], { kind: "keep", mode: "adv", totals: [1, 20], kept: 20 });
+
+    seq(0, 0.95); // first roll → 1, second roll → 20
+    const dis = rollWithMode("1d20", "dis");
+    assert.equal(dis.total, 1, "dis keeps the 1");
+    assert.deepEqual(dis.terms[0], { kind: "keep", mode: "dis", totals: [1, 20], kept: 1 });
+  } finally {
+    Math.random = real;
+  }
+});
+
 test("compound notation 2d6+1d4-2 parses into the expected terms", () => {
   const r = rollNotation("2d6+1d4-2");
   assert.equal(r.terms.length, 3);

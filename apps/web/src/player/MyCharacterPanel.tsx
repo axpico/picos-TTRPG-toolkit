@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import type { PartyMemberStatus } from "@toolkit/shared";
 import { HpBar } from "../modules/shared.js";
+import { CreatureSheetModal } from "../components/statblock/CreatureSheetModal.js";
 import { useMyCharacter, useUpdateMyCharacter } from "./usePlayer.js";
 import { addCondition, applyHpDelta, removeCondition } from "./format.js";
 
@@ -14,6 +15,7 @@ export function MyCharacterPanel({ campaignId }: { campaignId: string }) {
   const [amount, setAmount] = useState(1);
   const [notes, setNotes] = useState("");
   const [newCond, setNewCond] = useState("");
+  const [sheet, setSheet] = useState(false);
 
   const c = character.data;
   useEffect(() => {
@@ -56,7 +58,29 @@ export function MyCharacterPanel({ campaignId }: { campaignId: string }) {
           <h2 className="display truncate text-lg font-semibold">{c.name}</h2>
           <span className="font-mono text-sm text-ink-300">{c.hp}/{c.hpMax} HP</span>
         </div>
+        <button
+          className="btn-ghost h-8 shrink-0 px-2 text-xs"
+          onClick={() => setSheet(true)}
+          title="View character sheet and roll dice"
+        >
+          ⚄ Sheet
+        </button>
       </div>
+
+      {sheet && (
+        <CreatureSheetModal
+          open
+          readOnly
+          onClose={() => setSheet(false)}
+          title={c.name}
+          subtitle={c.playerName ? `Played by ${c.playerName}` : null}
+          campaignId={campaignId}
+          rollerName={c.name}
+          kind="player"
+          stats={c.stats}
+          hideHp
+        />
+      )}
 
       <HpBar hp={c.hp} hpMax={c.hpMax} />
 
