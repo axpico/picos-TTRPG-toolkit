@@ -63,6 +63,7 @@ function ShopWidget({ campaignId, state, setState }: WidgetContext) {
             create.mutate({ name: "New shop" }, { onSuccess: (s) => select(s.id) })
           }
           title="New empty shop"
+          aria-label="New empty shop"
         >
           +
         </button>
@@ -162,10 +163,10 @@ function ShopEditor({ shop, campaignId, onDelete }: EditorProps) {
 
       <div className="px-2 pt-2">
         <div className="mb-1 flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-wide text-ink-500">Notes</span>
+          <span className="text-[10px] uppercase tracking-wide text-ink-400">Notes</span>
           {shop.notes && (
             <button
-              className="ml-auto text-[10px] text-ink-500 hover:text-ink-200"
+              className="ml-auto text-[10px] text-ink-400 hover:text-ink-200"
               onClick={() => setNotesPreview((v) => !v)}
             >
               {notesPreview ? "edit" : "preview"}
@@ -221,7 +222,7 @@ function ShopEditor({ shop, campaignId, onDelete }: EditorProps) {
           </li>
         )}
         {shop.items.length > 0 && items.length === 0 && (
-          <li className="py-4 text-center text-xs text-ink-500">No items match the filter.</li>
+          <li className="py-4 text-center text-xs text-ink-400">No items match the filter.</li>
         )}
       </ul>
 
@@ -237,6 +238,7 @@ function ShopEditor({ shop, campaignId, onDelete }: EditorProps) {
           className="btn-primary px-2"
           disabled={!newItem.trim() || addItem.isPending}
           onClick={submitNewItem}
+          aria-label="Add item"
         >
           +
         </button>
@@ -294,6 +296,7 @@ function Row({ item, onChange, onAdjustStock, onRemove }: RowProps) {
           onClick={() => onAdjustStock(-1)}
           disabled={(item.stock ?? 0) <= 0}
           title="Sell one"
+          aria-label="Sell one (decrease stock)"
         >
           −
         </button>
@@ -310,11 +313,12 @@ function Row({ item, onChange, onAdjustStock, onRemove }: RowProps) {
           className="btn-ghost h-7 px-1.5"
           onClick={() => onAdjustStock(1)}
           title="Restock one"
+          aria-label="Restock one (increase stock)"
         >
           +
         </button>
       </div>
-      <button className="btn-ghost px-2 text-ink-500 hover:text-red-400" onClick={onRemove} title="Remove item">
+      <button className="btn-ghost px-2 text-ink-400 hover:text-red-400" onClick={onRemove} title="Remove item" aria-label="Remove item">
         ×
       </button>
     </li>

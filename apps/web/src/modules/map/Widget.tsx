@@ -723,6 +723,8 @@ function MapEditor({ campaignId, location, tool, setTool, onChange, onUpload, up
           className="btn-ghost shrink-0 px-2 py-1"
           onClick={() => setShowPanel((s) => !s)}
           title={showPanel ? "Hide panel" : "Show panel"}
+          aria-label={showPanel ? "Hide editor panel" : "Show editor panel"}
+          aria-expanded={showPanel}
         >
           {showPanel ? "⟩" : "⟨"}
         </button>
@@ -883,6 +885,7 @@ function MapEditor({ campaignId, location, tool, setTool, onChange, onUpload, up
                   className="px-2 py-1 hover:bg-ink-800"
                   onClick={() => zoomAtClient(1.25, centerX(viewportRef), centerY(viewportRef))}
                   title="Zoom in"
+                  aria-label="Zoom in"
                 >
                   +
                 </button>
@@ -890,10 +893,11 @@ function MapEditor({ campaignId, location, tool, setTool, onChange, onUpload, up
                   className="px-2 py-1 hover:bg-ink-800"
                   onClick={() => zoomAtClient(0.8, centerX(viewportRef), centerY(viewportRef))}
                   title="Zoom out"
+                  aria-label="Zoom out"
                 >
                   −
                 </button>
-                <button className="px-2 py-1 text-xs hover:bg-ink-800" onClick={fitToViewport} title="Fit to view">
+                <button className="px-2 py-1 text-xs hover:bg-ink-800" onClick={fitToViewport} title="Fit to view" aria-label="Fit map to view">
                   ⤢
                 </button>
               </div>
@@ -1055,7 +1059,7 @@ function MapEditor({ campaignId, location, tool, setTool, onChange, onUpload, up
                 <div className="space-y-3">
                   <div>
                     <div className="mb-1 font-medium text-ink-300">Player notes</div>
-                    <p className="mb-1 text-[10px] text-ink-500">Shown to players when this map is shared.</p>
+                    <p className="mb-1 text-[10px] text-ink-400">Shown to players when this map is shared.</p>
                     <textarea
                       className="input min-h-[80px]"
                       value={location.playerNotes ?? ""}
@@ -1064,7 +1068,7 @@ function MapEditor({ campaignId, location, tool, setTool, onChange, onUpload, up
                   </div>
                   <div>
                     <div className="mb-1 font-medium text-ink-300">GM notes</div>
-                    <p className="mb-1 text-[10px] text-ink-500">Private — never sent to players.</p>
+                    <p className="mb-1 text-[10px] text-ink-400">Private — never sent to players.</p>
                     <textarea
                       className="input min-h-[80px]"
                       value={location.gmNotes ?? ""}
@@ -1288,7 +1292,7 @@ function TokenPanel({
 
               {/* HP + AC */}
               <div className="mt-2 flex items-center gap-1.5 text-ink-300">
-                <span className="w-6 text-[10px] uppercase tracking-wide text-ink-500">HP</span>
+                <span className="w-6 text-[10px] uppercase tracking-wide text-ink-400">HP</span>
                 <input
                   type="number"
                   className="input w-14"
@@ -1296,7 +1300,7 @@ function TokenPanel({
                   placeholder="–"
                   onChange={(e) => updateToken(t.id, { hp: e.target.value === "" ? null : Number(e.target.value) })}
                 />
-                <span className="text-ink-500">/</span>
+                <span className="text-ink-400">/</span>
                 <input
                   type="number"
                   className="input w-14"
@@ -1304,7 +1308,7 @@ function TokenPanel({
                   placeholder="–"
                   onChange={(e) => updateToken(t.id, { hpMax: e.target.value === "" ? null : Number(e.target.value) })}
                 />
-                <span className="ml-2 w-6 text-[10px] uppercase tracking-wide text-ink-500">AC</span>
+                <span className="ml-2 w-6 text-[10px] uppercase tracking-wide text-ink-400">AC</span>
                 <input
                   type="number"
                   className="input w-14"
@@ -1383,11 +1387,11 @@ function SpawnPicker({
           >
             <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
             <span className="truncate">{m.name}</span>
-            <span className="ml-auto shrink-0 font-mono text-[10px] text-ink-500">{m.hp}/{m.hpMax}</span>
+            <span className="ml-auto shrink-0 font-mono text-[10px] text-ink-400">{m.hp}/{m.hpMax}</span>
           </button>
         ))
       ) : (
-        <div className="px-2 py-1 text-ink-600">No party members.</div>
+        <div className="px-2 py-1 text-ink-500">No party members.</div>
       )}
 
       <div className="mb-1 mt-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-red-400/80">Bestiary</div>
@@ -1411,12 +1415,12 @@ function SpawnPicker({
             >
               <span className="h-2 w-2 shrink-0 rounded-full bg-red-400" />
               <span className="truncate">{m.name}</span>
-              {hp !== null && <span className="ml-auto shrink-0 font-mono text-[10px] text-ink-500">{hp} hp</span>}
+              {hp !== null && <span className="ml-auto shrink-0 font-mono text-[10px] text-ink-400">{hp} hp</span>}
             </button>
           );
         })
       ) : (
-        <div className="px-2 py-1 text-ink-600">No monsters.</div>
+        <div className="px-2 py-1 text-ink-500">No monsters.</div>
       )}
     </div>
   );
@@ -1461,7 +1465,7 @@ function GridPanel({
           ⌖ Auto-detect
         </button>
       </div>
-      <p className="text-[10px] leading-relaxed text-ink-500">
+      <p className="text-[10px] leading-relaxed text-ink-400">
         <b>Calibrate</b> is the reliable way: click two adjacent grid intersections on the map.
         Or set how many squares span the map's width below.
       </p>

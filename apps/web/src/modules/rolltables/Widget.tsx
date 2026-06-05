@@ -147,6 +147,7 @@ function RollTablesWidget({ campaignId }: WidgetContext) {
           disabled={!newName.trim() || create.isPending}
           onClick={doCreate}
           title="Create table"
+          aria-label="Create table"
         >
           +
         </button>
@@ -154,6 +155,8 @@ function RollTablesWidget({ campaignId }: WidgetContext) {
           className="btn-ghost h-9 px-2 text-xs text-ink-400"
           onClick={() => setImportOpen((v) => !v)}
           title="Import / export tables"
+          aria-label="Import or export tables"
+          aria-expanded={importOpen}
         >
           ⇅
         </button>
@@ -216,10 +219,10 @@ function RollTablesWidget({ campaignId }: WidgetContext) {
 
       {/* Recent rolls */}
       {history.length > 1 && (
-        <ul className="border-b border-ink-800 px-3 py-1 text-xs text-ink-500">
+        <ul className="border-b border-ink-800 px-3 py-1 text-xs text-ink-400">
           {history.slice(1).map((h) => (
             <li key={h.rollId} className="truncate">
-              <span className="text-ink-600">{h.tableName}:</span> {h.text}
+              <span className="text-ink-500">{h.tableName}:</span> {h.text}
             </li>
           ))}
         </ul>
@@ -246,7 +249,7 @@ function RollTablesWidget({ campaignId }: WidgetContext) {
             />
           ))
         ) : (
-          <div className="flex h-full items-center justify-center text-center text-sm text-ink-500">
+          <div className="flex h-full items-center justify-center text-center text-sm text-ink-400">
             No tables yet.
             <br />
             Create one for loot, names, rumors, or random events.
@@ -297,7 +300,7 @@ function TableCard({ table, rolling, onRoll, onChange, onDelete }: TableCardProp
           onChange={(e) => setLocalName(e.target.value)}
           onBlur={() => localName.trim() && localName !== table.name && onChange({ name: localName.trim() })}
         />
-        <span className="shrink-0 font-mono text-xs text-ink-600">{table.entries.length}</span>
+        <span className="shrink-0 font-mono text-xs text-ink-500">{table.entries.length}</span>
         <button
           className="btn-primary h-9 px-3 text-xs"
           disabled={!canRoll || rolling}
@@ -319,7 +322,7 @@ function TableCard({ table, rolling, onRoll, onChange, onDelete }: TableCardProp
       {editing && (
         <div className="space-y-1 p-2">
           {!canRoll && (
-            <p className="px-1 text-xs text-ink-500">Add at least one result, then Save to roll.</p>
+            <p className="px-1 text-xs text-ink-400">Add at least one result, then Save to roll.</p>
           )}
           <input
             className="input w-full text-xs"
@@ -359,9 +362,10 @@ function TableCard({ table, rolling, onRoll, onChange, onDelete }: TableCardProp
                   }}
                 />
                 <button
-                  className="btn-ghost col-span-1 px-2 text-ink-500 hover:text-red-400"
+                  className="btn-ghost col-span-1 px-2 text-ink-400 hover:text-red-400"
                   onClick={() => setEntries(entries.filter((_, i) => i !== idx))}
                   title="Remove row"
+                  aria-label="Remove row"
                 >
                   ×
                 </button>

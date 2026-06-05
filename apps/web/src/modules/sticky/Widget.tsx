@@ -54,11 +54,13 @@ function StickyWidget({ state, setState }: WidgetContext) {
               type="button"
               onClick={() => setState({ color: c })}
               className={clsx(
-                "h-3.5 w-3.5 rounded-full border border-black/30 transition-transform hover:scale-110",
+                "h-3.5 w-3.5 rounded-full border border-black/30 transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-black",
                 color === c && "ring-1 ring-black",
               )}
               style={{ backgroundColor: c }}
               title="Change color"
+              aria-label="Change note color"
+              aria-pressed={color === c}
             />
           ))}
         </div>
@@ -68,6 +70,8 @@ function StickyWidget({ state, setState }: WidgetContext) {
             onClick={() => setShowTitle((v) => !v)}
             className="rounded px-1 text-xs font-semibold text-black/60 hover:bg-black/10 hover:text-black"
             title="Toggle title"
+            aria-label="Toggle title field"
+            aria-pressed={showTitle}
           >
             T
           </button>
@@ -76,6 +80,7 @@ function StickyWidget({ state, setState }: WidgetContext) {
             onClick={cycleFont}
             className="rounded px-1 text-xs text-black/60 hover:bg-black/10 hover:text-black"
             title="Text size"
+            aria-label="Cycle text size"
           >
             {fontSize === "sm" ? "A−" : fontSize === "lg" ? "A+" : "A"}
           </button>

@@ -138,7 +138,7 @@ function LibraryTab({ campaignId }: { campaignId: string }) {
           <li className="flex flex-col items-center gap-1 py-10 text-center">
             <span className="text-2xl opacity-40">🧑‍🤝‍🧑</span>
             <span className="text-sm text-ink-400">No NPCs match your filters.</span>
-            <span className="text-xs text-ink-500">
+            <span className="text-xs text-ink-400">
               Use <span className="text-ink-300">+ Add</span>, the{" "}
               <span className="text-ink-300">Generator</span>, or{" "}
               <span className="text-ink-300">Samples</span>.
@@ -192,9 +192,11 @@ function NpcRow({ npc, campaignId, onChange, onDelete, onCopy }: NpcRowProps) {
     <li className="overflow-hidden rounded-lg border border-ink-700 bg-ink-900 transition-colors hover:border-ink-600">
       <div className="flex items-center gap-1.5 px-2 py-1.5">
         <button
-          className="shrink-0 text-ink-500 transition-colors hover:text-ink-200"
+          className="shrink-0 text-ink-400 transition-colors hover:text-ink-200"
           onClick={() => setOpen((v) => !v)}
           title={open ? "Collapse" : "Expand"}
+          aria-label={open ? "Collapse NPC" : "Expand NPC"}
+          aria-expanded={open}
         >
           {open ? "▾" : "▸"}
         </button>
@@ -225,10 +227,12 @@ function NpcRow({ npc, campaignId, onChange, onDelete, onCopy }: NpcRowProps) {
             "btn h-7 w-7 shrink-0 p-0 text-sm transition-colors",
             npc.favorite
               ? "bg-amber-700/60 text-amber-200"
-              : "bg-ink-800 text-ink-500 hover:text-amber-300",
+              : "bg-ink-800 text-ink-400 hover:text-amber-300",
           )}
           onClick={() => onChange({ favorite: !npc.favorite })}
           title={npc.favorite ? "Unfavorite" : "Favorite"}
+          aria-label={npc.favorite ? "Remove from favorites" : "Add to favorites"}
+          aria-pressed={npc.favorite}
         >
           ★
         </button>
@@ -498,11 +502,11 @@ function GeneratorTab({ campaignId }: { campaignId: string }) {
             </div>
             <div className="grid grid-cols-2 gap-x-3 text-xs text-ink-300">
               <div>
-                <span className="text-ink-500">Quirk: </span>
+                <span className="text-ink-400">Quirk: </span>
                 {n.quirk}
               </div>
               <div>
-                <span className="text-ink-500">Hook: </span>
+                <span className="text-ink-400">Hook: </span>
                 {n.hook}
               </div>
             </div>
@@ -521,7 +525,7 @@ function GeneratorTab({ campaignId }: { campaignId: string }) {
           </li>
         ))}
         {results.length === 0 && (
-          <li className="flex h-full items-center justify-center py-8 text-center text-ink-500">
+          <li className="flex h-full items-center justify-center py-8 text-center text-ink-400">
             Choose a culture and roll some NPCs.
           </li>
         )}

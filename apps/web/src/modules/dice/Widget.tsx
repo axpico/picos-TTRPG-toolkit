@@ -53,7 +53,7 @@ function DiceWidget({ campaignId }: WidgetContext) {
           </button>
         ))}
         <button
-          className="btn-ghost ml-auto h-7 px-2 text-xs text-ink-500"
+          className="btn-ghost ml-auto h-7 px-2 text-xs text-ink-400"
           onClick={() => setNotation("")}
           title="Clear notation"
         >
@@ -150,7 +150,7 @@ function DiceWidget({ campaignId }: WidgetContext) {
                 <div className="flex items-baseline gap-2">
                   {r.hidden && <span title="Hidden — GM only">🔒</span>}
                   <span className="font-mono text-ink-300">{r.notation}</span>
-                  <span className="text-ink-500">→</span>
+                  <span className="text-ink-400">→</span>
                   <span
                     className={clsx(
                       "font-bold",
@@ -160,23 +160,23 @@ function DiceWidget({ campaignId }: WidgetContext) {
                     {r.result}
                   </span>
                   {r.label && (
-                    <span className="text-xs text-ink-500 italic">{r.label}</span>
+                    <span className="text-xs text-ink-400 italic">{r.label}</span>
                   )}
                   {r.rollerName && (
-                    <span className="text-xs text-ink-600">· {r.rollerName}</span>
+                    <span className="text-xs text-ink-500">· {r.rollerName}</span>
                   )}
-                  <span className="ml-auto shrink-0 font-mono text-xs text-ink-600">
+                  <span className="ml-auto shrink-0 font-mono text-xs text-ink-500">
                     {fmtTime(r.createdAt)}
                   </span>
                 </div>
-                <div className="mt-0.5 font-mono text-xs text-ink-500">
+                <div className="mt-0.5 font-mono text-xs text-ink-400">
                   {parseBreakdown(r.breakdownJson)}
                 </div>
               </li>
             ))}
           </ul>
         ) : (
-          <div className="flex h-full items-center justify-center text-sm text-ink-500">
+          <div className="flex h-full items-center justify-center text-sm text-ink-400">
             No rolls yet — pick a die or type a notation.
           </div>
         )}

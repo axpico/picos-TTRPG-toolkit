@@ -133,7 +133,7 @@ function SessionLogWidget({ campaignId }: WidgetContext) {
           return (
             <div key={entry.id}>
               {showDay && (
-                <div className="sticky top-0 z-10 -mx-2 mb-1 mt-2 bg-ink-900/90 px-3 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-500 backdrop-blur first:mt-0">
+                <div className="sticky top-0 z-10 -mx-2 mb-1 mt-2 bg-ink-900/90 px-3 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-400 backdrop-blur first:mt-0">
                   {day}
                 </div>
               )}
@@ -144,10 +144,10 @@ function SessionLogWidget({ campaignId }: WidgetContext) {
                 )}
                 onClick={hasData ? () => setExpanded(isOpen ? null : entry.id) : undefined}
               >
-                <span className="shrink-0 font-mono text-xs text-ink-500">{fmtTime(entry.createdAt)}</span>
+                <span className="shrink-0 font-mono text-xs text-ink-400">{fmtTime(entry.createdAt)}</span>
                 <span className={clsx("chip shrink-0 border", kindColor(entry.kind))}>{entry.kind}</span>
                 <span className="text-ink-200">{entry.message}</span>
-                {hasData && <span className="ml-auto shrink-0 text-xs text-ink-600">{isOpen ? "▾" : "▸"}</span>}
+                {hasData && <span className="ml-auto shrink-0 text-xs text-ink-500">{isOpen ? "▾" : "▸"}</span>}
               </div>
               {hasData && isOpen && (
                 <pre className="mb-1 ml-12 overflow-auto rounded-md border border-ink-700 bg-ink-900 p-2 text-[11px] text-ink-400">

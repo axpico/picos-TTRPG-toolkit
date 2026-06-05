@@ -79,7 +79,7 @@ function PartyTrackerWidget({ campaignId }: WidgetContext) {
           />
         ))}
         {list.data?.length === 0 && (
-          <li className="py-6 text-center text-sm text-ink-500">
+          <li className="py-6 text-center text-sm text-ink-400">
             No party members yet — add one above.
           </li>
         )}
@@ -184,6 +184,7 @@ function PartyMemberRow({ member, campaignId, onChange, onDelete }: PartyMemberR
           className="btn-ghost h-6 w-6 p-0 text-base leading-none"
           onClick={() => stepHp(-1)}
           title="−1 HP"
+          aria-label="Decrease HP by 1"
         >
           −
         </button>
@@ -195,7 +196,7 @@ function PartyMemberRow({ member, campaignId, onChange, onDelete }: PartyMemberR
           onBlur={() => localHp !== (member.hp ?? 0) && onChange({ hp: localHp })}
           title="Current HP"
         />
-        <span className="text-ink-600">/</span>
+        <span className="text-ink-500" aria-hidden="true">/</span>
         <input
           type="number"
           className="input w-14 text-center font-mono text-sm text-ink-300"
@@ -208,10 +209,11 @@ function PartyMemberRow({ member, campaignId, onChange, onDelete }: PartyMemberR
           className="btn-ghost h-6 w-6 p-0 text-base leading-none"
           onClick={() => stepHp(1)}
           title="+1 HP"
+          aria-label="Increase HP by 1"
         >
           +
         </button>
-        <span className="ml-auto font-mono text-xs text-ink-500">
+        <span className="ml-auto font-mono text-xs text-ink-400">
           {member.hpMax && member.hpMax > 0
             ? `${Math.round(((member.hp ?? 0) / member.hpMax) * 100)}%`
             : ""}
@@ -225,7 +227,7 @@ function PartyMemberRow({ member, campaignId, onChange, onDelete }: PartyMemberR
 
       {/* Quick damage / heal */}
       <div className="mt-1.5 flex items-center gap-1">
-        <span className="w-5 text-xs font-medium text-ink-500">dmg</span>
+        <span className="w-5 text-xs font-medium text-ink-400">dmg</span>
         <input
           type="number"
           className="input w-14 text-center font-mono text-xs"

@@ -8,7 +8,7 @@ import type {
   UpdatePartyMemberInput,
 } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
-import { HpBar, InlineConfirm } from "../shared.js";
+import { HpBar, InlineConfirm, StatusBadge } from "../shared.js";
 import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
 import { useParty, useUpdatePartyMember } from "../party/api.js";
 import { useNpcs } from "../npc/api.js";
@@ -91,7 +91,7 @@ function CombatTrackerWidget({ campaignId, state, setState }: WidgetContext) {
           onDelete={() => remove.mutate(selected.id)}
         />
       ) : (
-        <div className="flex flex-1 items-center justify-center text-sm text-ink-500">
+        <div className="flex flex-1 items-center justify-center text-sm text-ink-400">
           Create or select an encounter to start tracking initiative.
         </div>
       )}
@@ -332,7 +332,7 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
       {/* Round / turn status strip */}
       <div className="flex items-center gap-3 border-b border-ink-700 bg-ink-950/40 px-2.5 py-1 text-xs">
         <span className="flex items-center gap-1.5">
-          <span className="uppercase tracking-wide text-ink-500">Round</span>
+          <span className="uppercase tracking-wide text-ink-400">Round</span>
           <span
             className={clsx(
               "font-mono text-sm font-bold",
@@ -345,7 +345,7 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
         <span className="text-ink-700">·</span>
         {hasCombatants ? (
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className="text-ink-500">
+            <span className="text-ink-400">
               Turn{" "}
               <span className="font-mono text-ink-200">
                 {turnNumber}/{count}
@@ -361,7 +361,7 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
             )}
           </span>
         ) : (
-          <span className="text-ink-600">No combatants</span>
+          <span className="text-ink-500">No combatants</span>
         )}
       </div>
 
@@ -389,7 +389,7 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
           />
         ))}
         {!hasCombatants && (
-          <li className="py-4 text-center text-sm text-ink-500">
+          <li className="py-4 text-center text-sm text-ink-400">
             No combatants — add one below.
           </li>
         )}
@@ -397,7 +397,7 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
 
       {/* Add from party / NPC / bestiary */}
       <div className="flex items-center gap-1 border-t border-ink-700 bg-ink-900/50 px-2 py-1.5">
-        <span className="shrink-0 text-xs text-ink-500">Add from</span>
+        <span className="shrink-0 text-xs text-ink-400">Add from</span>
         <select
           className="input w-24"
           value={pickSource}
@@ -583,7 +583,7 @@ function CombatantRow({
       {/* Compact header — enough to run a turn without expanding */}
       <div className="flex items-center gap-1.5">
         <span
-          className="shrink-0 cursor-grab select-none px-0.5 text-ink-600 hover:text-ink-300 active:cursor-grabbing"
+          className="shrink-0 cursor-grab select-none px-0.5 text-ink-500 hover:text-ink-300 active:cursor-grabbing"
           title="Drag to reorder"
         >
           ⠿
@@ -609,26 +609,20 @@ function CombatantRow({
           onChange={(e) => setLocalName(e.target.value)}
           onBlur={() => localName !== combatant.name && onChange({ name: localName })}
         />
-        {combatant.isPC && (
-          <span className="shrink-0 rounded-full bg-sky-800/60 px-1.5 py-0.5 text-[10px] text-sky-300">
-            PC
-          </span>
-        )}
+        {combatant.isPC && <StatusBadge tone="info">PC</StatusBadge>}
         {combatant.conditions.length > 0 && (
-          <span
-            className="shrink-0 rounded-full bg-amber-900/50 px-1.5 py-0.5 text-[10px] font-medium text-amber-300"
-            title={combatant.conditions.join(", ")}
-          >
+          <StatusBadge tone="warn" title={combatant.conditions.join(", ")}>
             {combatant.conditions.length} cond
-          </span>
+          </StatusBadge>
         )}
         <button
           className={clsx(
             "btn-ghost h-6 px-1.5 text-xs",
-            combatant.defeated ? "text-emerald-400" : "text-ink-500 hover:text-red-400",
+            combatant.defeated ? "text-emerald-400" : "text-ink-400 hover:text-red-400",
           )}
           onClick={() => onChange({ defeated: !combatant.defeated })}
           title={combatant.defeated ? "Revive" : "Mark defeated"}
+          aria-label={combatant.defeated ? "Revive combatant" : "Mark combatant defeated"}
         >
           {combatant.defeated ? "Revive" : "💀"}
         </button>
@@ -642,9 +636,11 @@ function CombatantRow({
           </button>
         )}
         <button
-          className="btn-ghost h-6 w-6 shrink-0 p-0 text-ink-500 hover:text-ink-200"
+          className="btn-ghost h-6 w-6 shrink-0 p-0 text-ink-400 hover:text-ink-200"
           onClick={() => setExpanded((v) => !v)}
           title={expanded ? "Collapse" : "Expand"}
+          aria-label={expanded ? "Collapse combatant" : "Expand combatant"}
+          aria-expanded={expanded}
         >
           <span className={clsx("inline-block transition-transform", expanded && "rotate-90")}>
             ▸
@@ -674,6 +670,7 @@ function CombatantRow({
               className="btn-ghost h-6 w-6 p-0 text-base leading-none"
               onClick={() => stepHp(-1)}
               title="−1 HP"
+              aria-label="Decrease HP by 1"
             >
               −
             </button>
@@ -685,7 +682,7 @@ function CombatantRow({
               onBlur={() => localHp !== (combatant.hp ?? 0) && onChange({ hp: localHp })}
               title="HP"
             />
-            <span className="text-ink-600">/</span>
+            <span className="text-ink-500">/</span>
             <input
               type="number"
               className="input w-14 text-center font-mono text-xs text-ink-400"
@@ -698,10 +695,11 @@ function CombatantRow({
               className="btn-ghost h-6 w-6 p-0 text-base leading-none"
               onClick={() => stepHp(1)}
               title="+1 HP"
+              aria-label="Increase HP by 1"
             >
               +
             </button>
-            <span className="ml-1 text-xs text-ink-600">dmg</span>
+            <span className="ml-1 text-xs text-ink-500">dmg</span>
             <input
               type="number"
               className="input w-14 text-center font-mono text-xs"
@@ -729,7 +727,7 @@ function CombatantRow({
             >
               Heal
             </button>
-            <span className="ml-auto text-xs text-ink-600">AC</span>
+            <span className="ml-auto text-xs text-ink-500">AC</span>
             <input
               type="number"
               className="input w-12 text-center font-mono text-xs"
@@ -837,7 +835,7 @@ function ConditionEditor({
           <div className="absolute bottom-full left-0 z-20 mb-1 w-44 rounded-md border border-ink-700 bg-ink-850 p-1 shadow-lg">
             <div className="max-h-40 overflow-auto">
               {available.length === 0 ? (
-                <div className="px-2 py-1 text-[11px] text-ink-500">All standard conditions applied</div>
+                <div className="px-2 py-1 text-[11px] text-ink-400">All standard conditions applied</div>
               ) : (
                 available.map((c) => (
                   <button

@@ -136,7 +136,7 @@ function ClocksWidget({ campaignId }: WidgetContext) {
             ))}
           </div>
         ) : (
-          <div className="flex h-full items-center justify-center text-center text-sm text-ink-500">
+          <div className="flex h-full items-center justify-center text-center text-sm text-ink-400">
             No clocks yet.
             <br />
             Create one to track threats, progress, or countdowns.
@@ -184,16 +184,18 @@ function ClockCard({ clock, onChange, onDelete, onMove }: ClockCardProps) {
       <div className="flex items-center gap-1">
         <div className="flex shrink-0 flex-col">
           <button
-            className="h-3 leading-none text-[10px] text-ink-500 hover:text-ink-200"
+            className="h-3 leading-none text-[10px] text-ink-400 hover:text-ink-200"
             onClick={() => onMove(-1)}
             title="Move up"
+            aria-label="Move clock up"
           >
             ▲
           </button>
           <button
-            className="h-3 leading-none text-[10px] text-ink-500 hover:text-ink-200"
+            className="h-3 leading-none text-[10px] text-ink-400 hover:text-ink-200"
             onClick={() => onMove(1)}
             title="Move down"
+            aria-label="Move clock down"
           >
             ▼
           </button>
@@ -207,10 +209,12 @@ function ClockCard({ clock, onChange, onDelete, onMove }: ClockCardProps) {
         <button
           className={clsx(
             "btn-ghost h-6 px-1 text-xs",
-            clock.secret ? "text-amber-400" : "text-ink-500 hover:text-ink-200",
+            clock.secret ? "text-amber-400" : "text-ink-400 hover:text-ink-200",
           )}
           onClick={() => onChange({ secret: !clock.secret })}
           title={clock.secret ? "Secret — hidden from players" : "Visible to players when broadcast"}
+          aria-label={clock.secret ? "Make clock visible to players" : "Hide clock from players"}
+          aria-pressed={clock.secret}
         >
           {clock.secret ? "🔒" : "🔓"}
         </button>
@@ -254,7 +258,7 @@ function ClockCard({ clock, onChange, onDelete, onMove }: ClockCardProps) {
           + tick
         </button>
         <button
-          className="btn-ghost h-6 px-2 text-xs text-ink-500"
+          className="btn-ghost h-6 px-2 text-xs text-ink-400"
           onClick={() => onChange({ filled: 0 })}
           disabled={clock.filled === 0}
           title="Reset"
@@ -269,11 +273,13 @@ function ClockCard({ clock, onChange, onDelete, onMove }: ClockCardProps) {
           <button
             key={c}
             className={clsx(
-              "h-3.5 w-3.5 rounded-full border-2 transition-transform hover:scale-110",
+              "h-3.5 w-3.5 rounded-full border-2 transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500",
               clock.color === c ? "border-ink-100 scale-110" : "border-transparent",
             )}
             style={{ backgroundColor: c }}
             onClick={() => onChange({ color: c })}
+            aria-label={`Set clock color`}
+            aria-pressed={clock.color === c}
           />
         ))}
         <div className="ml-auto flex gap-0.5">
@@ -284,7 +290,7 @@ function ClockCard({ clock, onChange, onDelete, onMove }: ClockCardProps) {
                 "h-5 w-5 rounded text-[10px] font-mono",
                 clock.segments === n
                   ? "bg-ink-600 text-ink-100"
-                  : "text-ink-500 hover:text-ink-300",
+                  : "text-ink-400 hover:text-ink-300",
               )}
               onClick={() =>
                 onChange({ segments: n, filled: Math.min(clock.filled, n) })

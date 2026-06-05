@@ -75,6 +75,27 @@
     @apply inline-flex items-center gap-1 rounded-full border border-ink-700/60 bg-ink-800 px-2 py-0.5
            text-xs text-ink-200;
   }
+  /* Status badge: a compact pill with semantic intent. Use the modifiers below
+     instead of hand-rolling color combos in each widget. */
+  .badge {
+    @apply inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium
+           leading-none;
+  }
+  .badge-ok     { @apply badge bg-emerald-500/15 text-emerald-300; }
+  .badge-warn   { @apply badge bg-amber-500/15 text-amber-300; }
+  .badge-danger { @apply badge bg-red-500/15 text-red-300; }
+  .badge-info   { @apply badge bg-sky-500/15 text-sky-300; }
+  .badge-muted  { @apply badge bg-ink-800 text-ink-300; }
+  .badge-accent { @apply badge text-accent-fg; background-color: rgb(var(--accent-600)); }
+  /* Standard widget/section header bar. One consistent height + padding across
+     all widgets (replaces the py-1 / py-1.5 / py-2 divergence). */
+  .section-head {
+    @apply flex items-center gap-2 border-b border-ink-700/80 px-2.5 py-2;
+  }
+  /* Small uppercase label for form fields and section titles. One type size. */
+  .field-label {
+    @apply text-[11px] font-semibold uppercase tracking-wide text-ink-400;
+  }
   /* Display type for wordmarks and section headings. */
   .display {
     font-family: var(--font-display);

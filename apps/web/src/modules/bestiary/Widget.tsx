@@ -138,7 +138,7 @@ function LibraryTab({ campaignId }: { campaignId: string }) {
           <li className="flex flex-col items-center gap-1 py-10 text-center">
             <span className="text-2xl opacity-40">🐉</span>
             <span className="text-sm text-ink-400">No creatures match your filters.</span>
-            <span className="text-xs text-ink-500">
+            <span className="text-xs text-ink-400">
               Use <span className="text-ink-300">+ Add</span> or{" "}
               <span className="text-ink-300">Load samples</span> to get started.
             </span>
@@ -194,9 +194,11 @@ function MonsterRow({ monster, campaignId, onChange, onDelete, onCopy }: RowProp
     <li className="overflow-hidden rounded-lg border border-ink-700 bg-ink-900 transition-colors hover:border-ink-600">
       <div className="flex items-center gap-1.5 px-2 py-1.5">
         <button
-          className="shrink-0 text-ink-500 transition-colors hover:text-ink-200"
+          className="shrink-0 text-ink-400 transition-colors hover:text-ink-200"
           onClick={() => setOpen((v) => !v)}
           title={open ? "Collapse" : "Expand"}
+          aria-label={open ? "Collapse creature" : "Expand creature"}
+          aria-expanded={open}
         >
           {open ? "▾" : "▸"}
         </button>
@@ -239,7 +241,7 @@ function MonsterRow({ monster, campaignId, onChange, onDelete, onCopy }: RowProp
           {preview && <div className="font-medium text-ink-300">{preview}</div>}
           <div className="grid grid-cols-2 gap-1.5">
             <label className="flex flex-col gap-0.5">
-              <span className="text-ink-500">Type</span>
+              <span className="text-ink-400">Type</span>
               <input
                 className="input"
                 placeholder="e.g. fiend"
@@ -252,7 +254,7 @@ function MonsterRow({ monster, campaignId, onChange, onDelete, onCopy }: RowProp
               />
             </label>
             <label className="flex flex-col gap-0.5">
-              <span className="text-ink-500">Challenge</span>
+              <span className="text-ink-400">Challenge</span>
               <input
                 className="input"
                 placeholder="CR"
@@ -266,7 +268,7 @@ function MonsterRow({ monster, campaignId, onChange, onDelete, onCopy }: RowProp
             </label>
           </div>
           <label className="flex flex-col gap-0.5">
-            <span className="text-ink-500">Environment</span>
+            <span className="text-ink-400">Environment</span>
             <input
               className="input"
               placeholder="e.g. forest"
@@ -279,7 +281,7 @@ function MonsterRow({ monster, campaignId, onChange, onDelete, onCopy }: RowProp
             />
           </label>
           <label className="flex flex-col gap-0.5">
-            <span className="text-ink-500">Tags</span>
+            <span className="text-ink-400">Tags</span>
             <input
               className="input"
               placeholder="comma, separated"
@@ -296,7 +298,7 @@ function MonsterRow({ monster, campaignId, onChange, onDelete, onCopy }: RowProp
             />
           </label>
           <label className="flex flex-col gap-0.5">
-            <span className="text-ink-500">GM notes</span>
+            <span className="text-ink-400">GM notes</span>
             <textarea
               className="input min-h-[60px]"
               placeholder="Private notes…"
@@ -459,7 +461,7 @@ function GeneratorTab({ campaignId }: { campaignId: string }) {
           </li>
         ))}
         {results.length === 0 && (
-          <li className="flex h-full items-center justify-center py-8 text-center text-ink-500">
+          <li className="flex h-full items-center justify-center py-8 text-center text-ink-400">
             Pick a challenge rating and roll some creatures.
           </li>
         )}

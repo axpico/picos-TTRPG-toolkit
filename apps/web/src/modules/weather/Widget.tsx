@@ -76,7 +76,7 @@ function WeatherWidget({ campaignId }: WidgetContext) {
       <div className="space-y-2 border-b border-ink-700 p-3">
         <div className="flex items-center justify-between">
           <span className="text-xs uppercase tracking-wide text-ink-400">Currently</span>
-          {set.isPending && <span className="text-xs text-ink-500">Saving…</span>}
+          {set.isPending && <span className="text-xs text-ink-400">Saving…</span>}
         </div>
 
         <div className="flex items-start gap-2.5">
@@ -179,7 +179,7 @@ function WeatherWidget({ campaignId }: WidgetContext) {
           </p>
 
           {table.length === 0 ? (
-            <div className="rounded-md border border-dashed border-ink-700 px-3 py-4 text-center text-sm text-ink-500">
+            <div className="rounded-md border border-dashed border-ink-700 px-3 py-4 text-center text-sm text-ink-400">
               No custom table — rolls use the built-in default.
             </div>
           ) : (
@@ -215,13 +215,14 @@ function WeatherWidget({ campaignId }: WidgetContext) {
                         onChange={(e) => commitRowWeight(idx, Number(e.target.value))}
                         title="Relative weight"
                       />
-                      <span className="w-9 shrink-0 text-right text-xs text-ink-500" title="Chance">
+                      <span className="w-9 shrink-0 text-right text-xs text-ink-400" title="Chance">
                         {complete ? `${pct}%` : "—"}
                       </span>
                       <button
-                        className="btn-ghost h-7 px-2 text-ink-500 hover:text-red-400"
+                        className="btn-ghost h-7 px-2 text-ink-400 hover:text-red-400"
                         onClick={() => removeRow(idx)}
                         title="Remove row"
+                        aria-label="Remove weather row"
                       >
                         ×
                       </button>
@@ -262,7 +263,7 @@ function WeatherWidget({ campaignId }: WidgetContext) {
             </button>
             {table.length > 0 && (
               <button
-                className="btn-ghost h-7 text-xs text-ink-500 hover:text-red-400"
+                className="btn-ghost h-7 text-xs text-ink-400 hover:text-red-400"
                 onClick={() => {
                   setTable([]);
                   set.mutate({ table: null });

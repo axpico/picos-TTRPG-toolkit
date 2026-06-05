@@ -84,7 +84,7 @@ function TimersWidget({ campaignId }: WidgetContext) {
           onChange={(e) => setNewMinutes(Math.max(1, Number(e.target.value) || 1))}
           title="Minutes"
         />
-        <button className="btn-primary px-2" disabled={!newName.trim() || create.isPending} onClick={doCreate}>
+        <button className="btn-primary px-2" disabled={!newName.trim() || create.isPending} onClick={doCreate} aria-label="Add timer">
           +
         </button>
       </div>
@@ -166,10 +166,12 @@ function TimerCard({ timer, nowMs, onChange, onDelete }: TimerCardProps) {
         <button
           className={clsx(
             "btn-ghost h-6 px-1 text-xs",
-            timer.secret ? "text-amber-400" : "text-ink-500 hover:text-ink-200",
+            timer.secret ? "text-amber-400" : "text-ink-400 hover:text-ink-200",
           )}
           onClick={() => onChange({ secret: !timer.secret })}
           title={timer.secret ? "Secret — hidden from players" : "Visible to players when broadcast"}
+          aria-label={timer.secret ? "Make timer visible to players" : "Hide timer from players"}
+          aria-pressed={timer.secret}
         >
           {timer.secret ? "🔒" : "🔓"}
         </button>
@@ -205,10 +207,11 @@ function TimerCard({ timer, nowMs, onChange, onDelete }: TimerCardProps) {
           </button>
         )}
         <button
-          className="btn-ghost h-6 px-2 text-xs text-ink-500"
+          className="btn-ghost h-6 px-2 text-xs text-ink-400"
           onClick={reset}
           disabled={!running && remaining === timer.durationSeconds}
           title="Reset"
+          aria-label="Reset timer"
         >
           ↺
         </button>
@@ -219,11 +222,13 @@ function TimerCard({ timer, nowMs, onChange, onDelete }: TimerCardProps) {
           <button
             key={c}
             className={clsx(
-              "h-3.5 w-3.5 rounded-full border-2 transition-transform hover:scale-110",
+              "h-3.5 w-3.5 rounded-full border-2 transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500",
               timer.color === c ? "scale-110 border-ink-100" : "border-transparent",
             )}
             style={{ backgroundColor: c }}
             onClick={() => onChange({ color: c })}
+            aria-label="Set timer color"
+            aria-pressed={timer.color === c}
           />
         ))}
       </div>

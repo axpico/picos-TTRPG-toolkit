@@ -104,11 +104,12 @@ function SessionsWidget({ campaignId, state, setState }: WidgetContext) {
               );
             }}
             title="New session"
+            aria-label="New session"
           >
             +
           </button>
         </div>
-        <div className="flex items-center gap-2 border-b border-ink-800 px-2 py-1 text-[10px] uppercase tracking-wide text-ink-500">
+        <div className="flex items-center gap-2 border-b border-ink-800 px-2 py-1 text-[10px] uppercase tracking-wide text-ink-400">
           <span>{sessions.length} sessions</span>
           <button
             className="ml-auto hover:text-ink-200"
@@ -138,7 +139,7 @@ function SessionsWidget({ campaignId, state, setState }: WidgetContext) {
                 </div>
                 <div className="text-xs text-ink-400">{relativeDate(s.date)}</div>
                 {snippet(s) && (
-                  <div className="mt-0.5 truncate text-xs text-ink-500">{snippet(s)}</div>
+                  <div className="mt-0.5 truncate text-xs text-ink-400">{snippet(s)}</div>
                 )}
               </button>
             </li>
@@ -217,7 +218,7 @@ function SessionEditor({ session, saving, onChange, onDelete }: EditorProps) {
           onChange={(e) => setTitle(e.target.value)}
           onBlur={() => title !== session.title && onChange({ title })}
         />
-        <span className="w-14 shrink-0 text-right text-[10px] uppercase tracking-wide text-ink-500">
+        <span className="w-14 shrink-0 text-right text-[10px] uppercase tracking-wide text-ink-400">
           {saving ? "saving…" : "saved"}
         </span>
         <input
@@ -230,7 +231,7 @@ function SessionEditor({ session, saving, onChange, onDelete }: EditorProps) {
             onChange({ date: iso });
           }}
         />
-        <button className="btn-ghost px-2 text-ink-500 hover:text-red-400" title="Delete session" onClick={onDelete}>
+        <button className="btn-ghost px-2 text-ink-400 hover:text-red-400" title="Delete session" aria-label="Delete session" onClick={onDelete}>
           ×
         </button>
       </header>
@@ -272,7 +273,7 @@ function SessionEditor({ session, saving, onChange, onDelete }: EditorProps) {
             {notes.trim() ? (
               <Markdown>{notes}</Markdown>
             ) : (
-              <span className="text-sm text-ink-500">No notes yet — click Edit to write. Markdown supported.</span>
+              <span className="text-sm text-ink-400">No notes yet — click Edit to write. Markdown supported.</span>
             )}
           </div>
         ) : (
@@ -335,6 +336,8 @@ function SessionEditor({ session, saving, onChange, onDelete }: EditorProps) {
                 )}
                 <button
                   className="btn-ghost px-2"
+                  aria-label="Remove link"
+                  title="Remove link"
                   onClick={() => {
                     const next = links.filter((_, i) => i !== idx);
                     setLinks(next);

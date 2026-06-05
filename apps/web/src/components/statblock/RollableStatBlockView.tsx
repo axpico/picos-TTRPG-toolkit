@@ -204,13 +204,13 @@ export function RollableStatBlockView({
   const hitDie = hitDieFor(crForDice, stats.level != null ? "npc" : "beast");
 
   return (
-    <div className="rounded-lg border border-amber-500/30 bg-ink-900/60 p-4">
-      <header className="flex items-start gap-3 border-b-2 border-amber-500/40 pb-2">
+    <div className="rounded-lg border border-accent-500/30 bg-ink-900/60 p-4">
+      <header className="flex items-start gap-3 border-b-2 border-accent-500/40 pb-2">
         {portraitUrl && (
           <img src={portraitUrl} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" />
         )}
         <div className="min-w-0 flex-1">
-          {name && <h3 className="display text-lg font-semibold text-amber-300">{name}</h3>}
+          {name && <h3 className="display text-lg font-semibold text-accent-300">{name}</h3>}
           {meta && <p className="text-xs italic text-ink-400">{meta}</p>}
         </div>
         {fire && (
@@ -243,7 +243,7 @@ export function RollableStatBlockView({
       {/* Advantage toggle — applies to every d20 roll below. */}
       {fire && (
         <div className="mt-2 flex items-center gap-2">
-          <span className="text-[11px] uppercase tracking-wide text-ink-500">Roll mode</span>
+          <span className="text-[11px] uppercase tracking-wide text-ink-400">Roll mode</span>
           <div className="flex items-center rounded-lg border border-ink-700 bg-ink-900/60 p-0.5">
             {(
               [
@@ -277,7 +277,7 @@ export function RollableStatBlockView({
       {topLine && <p className="mt-2 text-sm font-medium text-ink-200">{topLine}</p>}
 
       {/* Ability grid */}
-      <div className="mt-3 grid grid-cols-6 gap-1 rounded-md border border-ink-700 bg-ink-950/40 p-2 text-center">
+      <div className="mt-3 grid grid-cols-3 gap-1 rounded-md border border-ink-700 bg-ink-950/40 p-2 text-center sm:grid-cols-6">
         {ABILITY_KEYS.map((k) => {
           const score = stats.abilities[k];
           const mod = abilityMod(score);
@@ -292,7 +292,7 @@ export function RollableStatBlockView({
           return (
             <button
               key={k}
-              className="rounded-md transition-colors hover:bg-accent-700/30"
+              className="rounded-md transition-colors hover:bg-accent-700/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
               title={`Roll ${ABILITY_NAMES[k]} check (Shift = advantage, Alt = disadvantage)`}
               onClick={(e) => fire(abilityCheckNotation(score, stats.profBonus), `${who} ${ABILITY_NAMES[k]} check`, e)}
             >
