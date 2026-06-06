@@ -1,7 +1,9 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
+import { createLogEntryInput } from "@toolkit/shared";
 import { prisma } from "../db.js";
 import { toLogDto } from "../lib/repos/log.js";
+import { writeLog } from "../services/log.js";
 
 const params = z.object({ id: z.string().min(1) });
 const query = z.object({
@@ -22,6 +24,16 @@ export const logRoutes: FastifyPluginAsync = async (app) => {
       take: limit,
     });
     return rows.map(toLogDto);
+  });
+
+  // Manual log entry — lets the GM jot a note straight into the campaign
+  // transcript (the Log widget's hub). DM-gated by the route group in app.ts.
+  app.post("/:id/log", async (req, reply) => {
+    const { id } = params.parse(req.params);
+    const body = createLogEntryInput.parse(req.body);
+    const row = await writeLog(app, id, body.kind, body.message, body.data);
+    reply.code(201);
+    return toLogDto(row);
   });
 
   const exportQuery = z.object({ kind: z.string().min(1).optional() });

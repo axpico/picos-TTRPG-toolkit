@@ -102,12 +102,14 @@ function PartyMemberRow({ member, campaignId, onChange, onDelete }: PartyMemberR
   const [localPlayer, setLocalPlayer] = useState(member.playerName ?? "");
   const [localHp, setLocalHp] = useState(member.hp ?? 0);
   const [localHpMax, setLocalHpMax] = useState(member.hpMax ?? 0);
+  const [localGold, setLocalGold] = useState(member.gold ?? 0);
   const [localConditions, setLocalConditions] = useState(member.conditions.join(", "));
   const [dmgInput, setDmgInput] = useState("");
   const [sheet, setSheet] = useState(false);
 
   useEffect(() => setLocalHp(member.hp ?? 0), [member.hp]);
   useEffect(() => setLocalHpMax(member.hpMax ?? 0), [member.hpMax]);
+  useEffect(() => setLocalGold(member.gold ?? 0), [member.gold]);
   useEffect(() => setLocalConditions(member.conditions.join(", ")), [member.conditions]);
 
   const isDead = member.status === "dead";
@@ -253,6 +255,23 @@ function PartyMemberRow({ member, campaignId, onChange, onDelete }: PartyMemberR
         >
           Heal
         </button>
+      </div>
+
+      {/* Gold (spent by the Shop widget on purchase) */}
+      <div className="mt-1.5 flex items-center gap-1.5">
+        <span className="w-5 text-xs font-medium text-amber-400" title="Gold">⛁</span>
+        <input
+          type="number"
+          className="input w-24 text-center font-mono text-xs text-amber-200"
+          value={localGold}
+          min={0}
+          onChange={(e) => setLocalGold(Number(e.target.value))}
+          onBlur={() =>
+            localGold !== (member.gold ?? 0) && onChange({ gold: Math.max(0, localGold) })
+          }
+          title="Gold"
+        />
+        <span className="text-xs text-ink-500">gp</span>
       </div>
 
       {/* Status buttons + conditions */}

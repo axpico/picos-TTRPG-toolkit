@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { dayPhase, weekdayName, type CalendarDefinition } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
+import type { AdvanceCalendarInput } from "@toolkit/shared";
 import { useAdvanceCalendar, useCalendar, useSetCalendar } from "./api.js";
+import { useRollWeather } from "../weather/api.js";
 
 function pad(n: number) {
   return n.toString().padStart(2, "0");
@@ -12,10 +14,12 @@ function formatDate(def: CalendarDefinition, y: number, mo: number, d: number) {
   return `${d} ${name} ${y}`;
 }
 
-function CalendarWidget({ campaignId }: WidgetContext) {
+function CalendarWidget({ campaignId, state, setState }: WidgetContext) {
   const data = useCalendar(campaignId);
   const set = useSetCalendar(campaignId);
   const advance = useAdvanceCalendar(campaignId);
+  const rollWeather = useRollWeather(campaignId);
+  const rollWeatherOnNewDay = state?.rollWeatherOnNewDay === true;
   const [editingDef, setEditingDef] = useState(false);
   const [defText, setDefText] = useState("");
   const [defErr, setDefErr] = useState<string | null>(null);
@@ -30,6 +34,24 @@ function CalendarWidget({ campaignId }: WidgetContext) {
 
   const c = data.data;
   const def = c.definition;
+
+  /**
+   * Advance time, and — when the GM opted in — roll fresh weather whenever the
+   * date rolls over to a new day. Reuses the weather module's own roll endpoint
+   * (which logs and broadcasts on its own), so no extra wiring is needed.
+   */
+  const doAdvance = (input: AdvanceCalendarInput) => {
+    advance.mutate(input, {
+      onSuccess: (next) => {
+        if (!rollWeatherOnNewDay) return;
+        const dayChanged =
+          next.currentYear !== c.currentYear ||
+          next.currentMonth !== c.currentMonth ||
+          next.currentDay !== c.currentDay;
+        if (dayChanged) rollWeather.mutate();
+      },
+    });
+  };
 
   const commitDef = () => {
     try {
@@ -71,27 +93,36 @@ function CalendarWidget({ campaignId }: WidgetContext) {
       <div className="grid grid-cols-3 gap-1.5 p-3 text-sm">
         <button
           className="btn-ghost"
-          onClick={() => advance.mutate({ rounds: 1 })}
+          onClick={() => doAdvance({ rounds: 1 })}
           disabled={advance.isPending}
         >
           +1 round
         </button>
-        <button className="btn-ghost" onClick={() => advance.mutate({ minutes: 10 })}>
+        <button className="btn-ghost" onClick={() => doAdvance({ minutes: 10 })}>
           +10 min
         </button>
-        <button className="btn-ghost" onClick={() => advance.mutate({ hours: 1 })}>
+        <button className="btn-ghost" onClick={() => doAdvance({ hours: 1 })}>
           +1 hour
         </button>
-        <button className="btn-ghost" onClick={() => advance.mutate({ hours: 8 })}>
+        <button className="btn-ghost" onClick={() => doAdvance({ hours: 8 })}>
           +8 hours
         </button>
-        <button className="btn-ghost" onClick={() => advance.mutate({ days: 1 })}>
+        <button className="btn-ghost" onClick={() => doAdvance({ days: 1 })}>
           +1 day
         </button>
-        <button className="btn-ghost" onClick={() => advance.mutate({ days: 7 })}>
+        <button className="btn-ghost" onClick={() => doAdvance({ days: 7 })}>
           +1 week
         </button>
       </div>
+
+      <label className="flex items-center gap-2 border-t border-ink-700 px-3 py-2 text-xs text-ink-400">
+        <input
+          type="checkbox"
+          checked={rollWeatherOnNewDay}
+          onChange={(e) => setState({ rollWeatherOnNewDay: e.target.checked })}
+        />
+        Roll new weather when the day changes
+      </label>
 
       {/* Time-of-day presets */}
       <div className="grid grid-cols-4 gap-1.5 border-t border-ink-700 px-3 pb-3 text-xs">

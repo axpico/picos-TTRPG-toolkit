@@ -14,6 +14,7 @@ export function toPartyDto(row: DbPartyMember): PartyDto {
     playerName: row.playerName,
     hp: row.hp,
     hpMax: row.hpMax,
+    gold: row.gold,
     status: partyMemberStatus.catch("active").parse(row.status),
     conditions: parseJsonField(row.conditionsJson, conditionsSchema, []),
     notes: row.notes,

@@ -81,7 +81,9 @@ test("compound notation 2d6+1d4-2 parses into the expected terms", () => {
 test("total equals the sum of all term contributions", () => {
   const r = rollNotation("3d8+4");
   const sum = r.terms.reduce(
-    (acc, t) => acc + (t.kind === "const" ? t.value : t.rolls.reduce((a, b) => a + b, 0)),
+    (acc, t) =>
+      acc +
+      (t.kind === "const" ? t.value : t.kind === "roll" ? t.rolls.reduce((a, b) => a + b, 0) : 0),
     0,
   );
   assert.equal(r.total, sum);
@@ -95,4 +97,41 @@ test("breakdownJson round-trips to the terms array", () => {
 test("whitespace is ignored", () => {
   const r = rollNotation(" 1d4 + 2 ");
   assert.equal(r.terms.length, 2);
+});
+
+test("rollWithMode total equals the sum of its terms, with the keep summary contributing nothing", () => {
+  // Guards the term-kind discrimination (const / roll / keep): the prepended
+  // "keep" summary term must not be double-counted into the total alongside the
+  // kept roll's own terms.
+  const real = Math.random;
+  try {
+    // Each rollNotation("1d6+2") consumes one random for the d6. First roll → 1
+    // (total 3), second roll → 6 (total 8); advantage keeps the second.
+    const seq = (...vals: number[]) => {
+      let i = 0;
+      Math.random = () => vals[i++ % vals.length]!;
+    };
+    seq(0, 0.95);
+    const adv = rollWithMode("1d6+2", "adv");
+    assert.equal(adv.total, 8);
+    assert.equal(adv.terms[0]!.kind, "keep");
+    const sum = adv.terms.reduce(
+      (acc, t) =>
+        acc +
+        (t.kind === "const"
+          ? t.value
+          : t.kind === "roll"
+            ? t.rolls.reduce((a, b) => a + b, 0)
+            : 0),
+      0,
+    );
+    assert.equal(sum, adv.total);
+
+    // Disadvantage keeps the lower (first) roll's total of 3.
+    seq(0, 0.95);
+    const dis = rollWithMode("1d6+2", "dis");
+    assert.equal(dis.total, 3);
+  } finally {
+    Math.random = real;
+  }
 });

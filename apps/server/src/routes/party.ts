@@ -29,6 +29,7 @@ export const partyRoutes: FastifyPluginAsync = async (app) => {
         playerName: body.playerName ?? null,
         hp: body.hp ?? 0,
         hpMax: body.hpMax ?? 0,
+        gold: body.gold ?? 0,
         status: body.status ?? "active",
         conditionsJson: JSON.stringify(body.conditions ?? []),
         notes: body.notes ?? null,
@@ -53,6 +54,7 @@ export const partyRoutes: FastifyPluginAsync = async (app) => {
         ...(body.playerName !== undefined ? { playerName: body.playerName ?? null } : {}),
         ...(body.hp !== undefined ? { hp: body.hp } : {}),
         ...(body.hpMax !== undefined ? { hpMax: body.hpMax } : {}),
+        ...(body.gold !== undefined ? { gold: body.gold } : {}),
         ...(body.status !== undefined ? { status: body.status } : {}),
         ...(body.conditions !== undefined
           ? { conditionsJson: JSON.stringify(body.conditions) }

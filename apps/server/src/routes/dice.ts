@@ -4,6 +4,7 @@ import { createDiceInput } from "@toolkit/shared";
 import { prisma } from "../db.js";
 import { rollWithMode } from "../lib/dice.js";
 import { toDiceDto, visibleRolls, type Roller } from "../lib/repos/dice.js";
+import { writeLog } from "../services/log.js";
 
 const cidParams = z.object({ id: z.string().min(1) });
 
@@ -49,6 +50,13 @@ export const diceRoutes: FastifyPluginAsync = async (app) => {
       ...(hidden ? {} : { broadcastKey: "dice" }),
       payload: { roll: dto },
     });
+    await writeLog(
+      app,
+      id,
+      "dice.roll",
+      `${roller.displayName} rolled ${dto.notation}${dto.label ? ` (${dto.label})` : ""} → ${dto.result}${hidden ? " (hidden)" : ""}`,
+      { rollId: dto.id, hidden },
+    );
     reply.code(201);
     return dto;
   });

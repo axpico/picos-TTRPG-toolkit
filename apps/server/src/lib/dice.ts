@@ -41,7 +41,7 @@ export function rollNotation(notation: string, seed?: string) {
   let total = 0;
   for (const t of terms) {
     if (t.kind === "const") total += t.value;
-    else total += t.rolls.reduce((s, v) => s + v, 0);
+    else if (t.kind === "roll") total += t.rolls.reduce((s, v) => s + v, 0);
   }
 
   return { notation, total, terms, breakdownJson: JSON.stringify(terms) };

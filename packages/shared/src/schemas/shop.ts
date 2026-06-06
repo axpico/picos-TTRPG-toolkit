@@ -45,6 +45,12 @@ export type CreateShopItemInput = z.infer<typeof createShopItemInput>;
 export const updateShopItemInput = createShopItemInput.partial();
 export type UpdateShopItemInput = z.infer<typeof updateShopItemInput>;
 
+export const purchaseShopItemInput = z.object({
+  memberId: z.string().min(1),
+  quantity: z.number().int().min(1).max(999).default(1),
+});
+export type PurchaseShopItemInput = z.infer<typeof purchaseShopItemInput>;
+
 export const generateShopInput = z.object({
   name: z.string().max(120).optional(),
   flavor: z.enum(["general", "weapons", "alchemy", "magical", "spacer"]).optional(),

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { EmptyState } from "../../components/EmptyState.js";
-import { useLog } from "./api.js";
+import { useToast } from "../../components/Toast.js";
+import { useAddLogNote, useLog } from "./api.js";
 
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -35,6 +36,8 @@ function kindColor(kind: string): string {
     case "dice":
     case "rolltable":
       return "border-amber-500/40 bg-amber-500/10 text-amber-300";
+    case "shop":
+      return "border-yellow-500/40 bg-yellow-500/10 text-yellow-300";
     case "weather":
     case "calendar":
     case "clock":
@@ -46,9 +49,25 @@ function kindColor(kind: string): string {
 
 function SessionLogWidget({ campaignId }: WidgetContext) {
   const log = useLog(campaignId);
+  const addNote = useAddLogNote(campaignId);
+  const toast = useToast();
+  const [note, setNote] = useState("");
   const [kindFilter, setKindFilter] = useState("");
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
+
+  const submitNote = () => {
+    const message = note.trim();
+    if (!message) return;
+    addNote.mutate(
+      { kind: "note", message },
+      {
+        onSuccess: () => setNote(""),
+        onError: (err) =>
+          toast(err instanceof Error ? err.message : "Failed to add note", "error"),
+      },
+    );
+  };
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
 
@@ -121,6 +140,25 @@ function SessionLogWidget({ campaignId }: WidgetContext) {
         >
           Export ↓
         </a>
+      </div>
+
+      <div className="flex items-center gap-2 border-b border-ink-700 px-3 py-1.5">
+        <span className="shrink-0 text-xs text-ink-500" aria-hidden="true">🪶</span>
+        <input
+          className="input h-6 flex-1 py-0 text-xs"
+          placeholder="Add a note to the log…"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && submitNote()}
+          autoComplete="off"
+        />
+        <button
+          className="btn-primary h-6 shrink-0 px-2 py-0 text-xs"
+          disabled={addNote.isPending || !note.trim()}
+          onClick={submitNote}
+        >
+          Add
+        </button>
       </div>
 
       <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-auto px-2 py-2 text-sm">

@@ -11,6 +11,7 @@ import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.
 import { HpBar, InlineConfirm, StatusBadge } from "../shared.js";
 import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
 import { useParty, useUpdatePartyMember } from "../party/api.js";
+import { useAdvanceCalendar } from "../calendar/api.js";
 import { useNpcs } from "../npc/api.js";
 import { useMonsters } from "../bestiary/api.js";
 import { CONDITIONS } from "./conditions.js";
@@ -35,6 +36,7 @@ function CombatTrackerWidget({ campaignId, state, setState }: WidgetContext) {
   const [newName, setNewName] = useState("");
 
   const selectedId = (state?.selectedEncounterId as string | undefined) ?? null;
+  const advanceWorldTime = state?.advanceWorldTime === true;
   const selected =
     list.data?.find((e) => e.id === selectedId) ??
     list.data?.find((e) => e.active) ??
@@ -88,6 +90,8 @@ function CombatTrackerWidget({ campaignId, state, setState }: WidgetContext) {
         <EncounterPane
           encounter={selected}
           campaignId={campaignId}
+          advanceWorldTime={advanceWorldTime}
+          onToggleAdvanceWorldTime={(v) => setState({ advanceWorldTime: v })}
           onDelete={() => remove.mutate(selected.id)}
         />
       ) : (
@@ -102,13 +106,22 @@ function CombatTrackerWidget({ campaignId, state, setState }: WidgetContext) {
 interface EncounterPaneProps {
   campaignId: string;
   encounter: Encounter;
+  advanceWorldTime: boolean;
+  onToggleAdvanceWorldTime: (value: boolean) => void;
   onDelete: () => void;
 }
 
-function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) {
+function EncounterPane({
+  campaignId,
+  encounter,
+  advanceWorldTime,
+  onToggleAdvanceWorldTime,
+  onDelete,
+}: EncounterPaneProps) {
   const update = useUpdateEncounter(campaignId);
   const next = useNextTurn(campaignId);
   const prev = usePrevTurn(campaignId);
+  const advanceCalendar = useAdvanceCalendar(campaignId);
   const rollInit = useRollInitiative(campaignId);
   const addCombatant = useAddCombatant(campaignId);
   const updateCombatant = useUpdateCombatant(campaignId);
@@ -207,6 +220,26 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
     syncToParty(combatant, input);
   };
 
+  // Latest round/toggle, mirrored into a ref so the keyboard handler (whose
+  // effect only re-subscribes on encounter.id) reads fresh values rather than
+  // a stale closure.
+  const nextRef = useRef({ round: encounter.round, advanceWorldTime });
+  nextRef.current = { round: encounter.round, advanceWorldTime };
+
+  // Advance to the next turn. When the GM has opted into "advance world time",
+  // each combat round that elapses pushes the in-world clock forward by one
+  // round (6s) via the Calendar module's own advance endpoint (which logs).
+  const doNext = () => {
+    const { round: prevRound, advanceWorldTime: advance } = nextRef.current;
+    next.mutate(encounter.id, {
+      onSuccess: (enc) => {
+        if (!advance) return;
+        const rounds = enc.round - prevRound;
+        if (rounds > 0) advanceCalendar.mutate({ rounds });
+      },
+    });
+  };
+
   // Find the library entity (party member / NPC / monster) a combatant was drawn
   // from, by name, so we can show its character sheet. Returns null when nothing
   // with a stat block matches.
@@ -259,7 +292,7 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
       const k = e.key.toLowerCase();
       if (k === "n" || e.key === "ArrowRight") {
         e.preventDefault();
-        next.mutate(encounter.id);
+        doNext();
       } else if (k === "p" || e.key === "ArrowLeft") {
         e.preventDefault();
         prev.mutate(encounter.id);
@@ -303,7 +336,7 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
             isActive && hasCombatants && "text-accent-500 ring-1 ring-accent-500/50",
           )}
           disabled={!hasCombatants}
-          onClick={() => next.mutate(encounter.id)}
+          onClick={doNext}
           title="Advance to next turn (N or →)"
         >
           Next turn →
@@ -363,6 +396,17 @@ function EncounterPane({ campaignId, encounter, onDelete }: EncounterPaneProps) 
         ) : (
           <span className="text-ink-500">No combatants</span>
         )}
+        <label
+          className="ml-auto flex cursor-pointer items-center gap-1 text-ink-400 select-none"
+          title="Advance the Calendar's in-world time by one round (6s) each combat round"
+        >
+          <input
+            type="checkbox"
+            checked={advanceWorldTime}
+            onChange={(e) => onToggleAdvanceWorldTime(e.target.checked)}
+          />
+          Advance world time
+        </label>
       </div>
 
       {/* Combatant list */}

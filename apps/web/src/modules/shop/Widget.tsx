@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import clsx from "clsx";
-import type { GenerateShopInput, Shop, ShopItem } from "@toolkit/shared";
+import type { GenerateShopInput, PartyMember, Shop, ShopItem } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { EmptyState } from "../../components/EmptyState.js";
 import { Markdown } from "../../components/Markdown.js";
 import { useConfirm } from "../../components/ConfirmDialog.js";
 import { useToast } from "../../components/Toast.js";
 import { InlineConfirm } from "../shared.js";
+import { useParty } from "../party/api.js";
 import { ITEM_TYPES, RARITIES, fmtPrice, rarityColor } from "./constants.js";
 import {
   useCreateShop,
@@ -14,6 +15,7 @@ import {
   useDeleteShop,
   useDeleteShopItem,
   useGenerateShop,
+  usePurchaseItem,
   useShops,
   useUpdateShop,
   useUpdateShopItem,
@@ -94,11 +96,28 @@ function ShopEditor({ shop, campaignId, onDelete }: EditorProps) {
   const addItem = useCreateShopItem(campaignId);
   const updateItem = useUpdateShopItem(campaignId);
   const removeItem = useDeleteShopItem(campaignId);
+  const purchase = usePurchaseItem(campaignId);
+  const party = useParty(campaignId);
   const confirm = useConfirm();
   const toast = useToast();
   const [newItem, setNewItem] = useState("");
   const [filter, setFilter] = useState("");
+  const [buyerId, setBuyerId] = useState("");
   const [notesPreview, setNotesPreview] = useState(Boolean(shop.notes));
+
+  const buyer = party.data?.find((m) => m.id === buyerId) ?? null;
+
+  const buyItem = (it: ShopItem) => {
+    if (!buyer) return;
+    purchase.mutate(
+      { shopId: shop.id, itemId: it.id, input: { memberId: buyer.id, quantity: 1 } },
+      {
+        onSuccess: ({ member }) =>
+          toast(`${member.name} bought ${it.name} — ${member.gold}g left`, "success"),
+        onError: (e) => toast(e instanceof Error ? e.message : "Purchase failed.", "error"),
+      },
+    );
+  };
 
   const items = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -161,6 +180,23 @@ function ShopEditor({ shop, campaignId, onDelete }: EditorProps) {
         </span>
       </div>
 
+      {/* Buyer: sells to a party member, deducting their gold (Party Tracker). */}
+      <div className="flex items-center gap-1.5 border-b border-ink-800 px-2 py-1 text-xs text-ink-400">
+        <span className="shrink-0">Buyer</span>
+        <select
+          className="input flex-1"
+          value={buyerId}
+          onChange={(e) => setBuyerId(e.target.value)}
+        >
+          <option value="">— select to enable Buy —</option>
+          {party.data?.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name} ({m.gold}g)
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="px-2 pt-2">
         <div className="mb-1 flex items-center gap-2">
           <span className="text-[10px] uppercase tracking-wide text-ink-400">Notes</span>
@@ -207,6 +243,9 @@ function ShopEditor({ shop, campaignId, onDelete }: EditorProps) {
           <Row
             key={it.id}
             item={it}
+            buyer={buyer}
+            buyPending={purchase.isPending}
+            onBuy={() => buyItem(it)}
             onChange={(input) => updateItem.mutate({ shopId: shop.id, id: it.id, input })}
             onAdjustStock={(delta) => adjustStock(it, delta)}
             onRemove={() => handleRemoveItem(it)}
@@ -249,12 +288,26 @@ function ShopEditor({ shop, campaignId, onDelete }: EditorProps) {
 
 interface RowProps {
   item: ShopItem;
+  buyer: PartyMember | null;
+  buyPending: boolean;
+  onBuy: () => void;
   onChange: (input: Parameters<ReturnType<typeof useUpdateShopItem>["mutate"]>[0]["input"]) => void;
   onAdjustStock: (delta: number) => void;
   onRemove: () => void;
 }
 
-function Row({ item, onChange, onAdjustStock, onRemove }: RowProps) {
+function Row({ item, buyer, buyPending, onBuy, onChange, onAdjustStock, onRemove }: RowProps) {
+  const outOfStock = item.stock !== null && (item.stock ?? 0) <= 0;
+  const cost = Math.round(item.price ?? 0);
+  const tooPoor = buyer !== null && buyer.gold < cost;
+  const canBuy = buyer !== null && !outOfStock && !tooPoor && !buyPending;
+  const buyTitle = !buyer
+    ? "Select a buyer above"
+    : outOfStock
+      ? "Out of stock"
+      : tooPoor
+        ? `${buyer.name} can't afford ${cost}g`
+        : `${buyer.name} buys for ${cost}g`;
   return (
     <li
       className={clsx(
@@ -318,6 +371,14 @@ function Row({ item, onChange, onAdjustStock, onRemove }: RowProps) {
           +
         </button>
       </div>
+      <button
+        className="btn-ghost h-7 px-2 text-xs text-amber-300 hover:text-amber-200 disabled:opacity-40"
+        onClick={onBuy}
+        disabled={!canBuy}
+        title={buyTitle}
+      >
+        Buy
+      </button>
       <button className="btn-ghost px-2 text-ink-400 hover:text-red-400" onClick={onRemove} title="Remove item" aria-label="Remove item">
         ×
       </button>

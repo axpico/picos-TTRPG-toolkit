@@ -106,6 +106,7 @@ model PartyMember {
   playerName      String?
   hp              Int      @default(0)
   hpMax           Int      @default(0)
+  gold            Int      @default(0)
   status          String   @default("active") // active|down|stable|dead
   conditionsJson  String   @default("[]")
   notes           String?

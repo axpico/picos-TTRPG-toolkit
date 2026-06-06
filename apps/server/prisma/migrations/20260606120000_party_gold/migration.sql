@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "PartyMember" ADD COLUMN "gold" INTEGER NOT NULL DEFAULT 0;

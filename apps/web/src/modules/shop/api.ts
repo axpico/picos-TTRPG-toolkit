@@ -3,6 +3,8 @@ import type {
   CreateShopInput,
   CreateShopItemInput,
   GenerateShopInput,
+  PartyMember,
+  PurchaseShopItemInput,
   Shop,
   ShopItem,
   UpdateShopInput,
@@ -77,6 +79,21 @@ export function useUpdateShopItem(campaignId: string) {
         args.input,
       ),
     onSuccess: () => qc.invalidateQueries({ queryKey: key(campaignId) }),
+  });
+}
+
+export function usePurchaseItem(campaignId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { shopId: string; itemId: string; input: PurchaseShopItemInput }) =>
+      api.post<{ member: PartyMember; item: ShopItem }>(
+        `/api/campaigns/${campaignId}/shops/${args.shopId}/items/${args.itemId}/purchase`,
+        args.input,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: key(campaignId) });
+      qc.invalidateQueries({ queryKey: ["party", campaignId] });
+    },
   });
 }
 

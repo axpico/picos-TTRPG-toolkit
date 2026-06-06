@@ -4,12 +4,15 @@ import {
   createShopInput,
   createShopItemInput,
   generateShopInput,
+  purchaseShopItemInput,
   updateShopInput,
   updateShopItemInput,
 } from "@toolkit/shared";
 import { prisma } from "../db.js";
 import { toShopDto, toShopItemDto } from "../lib/repos/shop.js";
+import { toPartyDto } from "../lib/repos/party.js";
 import { generateShop } from "../lib/shop-generator.js";
+import { resolvePurchase } from "../lib/shop-purchase.js";
 import { writeLog } from "../services/log.js";
 
 const cidParams = z.object({ id: z.string().min(1) });
@@ -114,6 +117,60 @@ export const shopRoutes: FastifyPluginAsync = async (app) => {
     const { itemId } = itemParams.parse(req.params);
     await prisma.shopItem.delete({ where: { id: itemId } });
     reply.code(204).send();
+  });
+
+  // Buy an item on behalf of a party member: deducts the member's gold and
+  // decrements the item's stock atomically, then logs the transaction. Wires
+  // the Shop widget to the Party Tracker's gold.
+  app.post("/:id/shops/:shopId/items/:itemId/purchase", async (req) => {
+    const { id, shopId, itemId } = itemParams.parse(req.params);
+    const { memberId, quantity } = purchaseShopItemInput.parse(req.body);
+
+    const fail = (status: number, message: string) => {
+      const err = new Error(message) as Error & { statusCode: number };
+      err.statusCode = status;
+      return err;
+    };
+
+    const item = await prisma.shopItem.findUnique({ where: { id: itemId } });
+    if (!item || item.shopId !== shopId) throw fail(404, "Item not found.");
+    const member = await prisma.partyMember.findUnique({ where: { id: memberId } });
+    if (!member || member.campaignId !== id) throw fail(404, "Party member not found.");
+
+    const calc = resolvePurchase({
+      price: item.price,
+      stock: item.stock,
+      gold: member.gold,
+      quantity,
+    });
+    if (!calc.ok) throw fail(calc.status, calc.message);
+
+    const [updatedItem, updatedMember] = await prisma.$transaction([
+      prisma.shopItem.update({
+        where: { id: itemId },
+        data: calc.newStock !== null ? { stock: calc.newStock } : {},
+      }),
+      prisma.partyMember.update({
+        where: { id: memberId },
+        data: { gold: calc.newGold },
+      }),
+    ]);
+
+    const memberDto = toPartyDto(updatedMember);
+    app.bus.emit(id, {
+      type: "party.update",
+      campaignId: id,
+      broadcastKey: "party",
+      payload: { member: memberDto },
+    });
+    await writeLog(
+      app,
+      id,
+      "shop.purchase",
+      `${memberDto.name} bought ${quantity}× ${item.name} for ${calc.total}g`,
+      { memberId, itemId, quantity, total: calc.total },
+    );
+    return { member: memberDto, item: toShopItemDto(updatedItem) };
   });
 
   app.post("/:id/shops/generate", async (req, reply) => {

@@ -29,6 +29,7 @@ export const logEntryKind = z.enum([
   "shop.update",
   "shop.delete",
   "shop.generate",
+  "shop.purchase",
   "location.create",
   "location.update",
   "location.delete",

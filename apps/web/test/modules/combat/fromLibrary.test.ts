@@ -16,6 +16,7 @@ const partyMember = (over: Partial<PartyMember> = {}): PartyMember => ({
   playerName: null,
   hp: 18,
   hpMax: 24,
+  gold: 0,
   status: "active",
   conditions: [],
   notes: null,
