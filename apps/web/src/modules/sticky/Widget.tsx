@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
-import { useBroadcasts, useSetBroadcast } from "../broadcast/api.js";
+import { useWidgetBroadcast } from "../broadcast/api.js";
 
 const COLORS = [
   "#fde68a", // amber
@@ -40,22 +40,14 @@ function StickyWidget({ campaignId, state, setState, broadcastKey }: WidgetConte
   // Sticky notes share their own canvas state (share: "state"): while the GM has
   // this note broadcasting, push edits into the broadcast payload so the player
   // view stays in sync. Debounced so typing doesn't hammer the API.
-  const broadcasts = useBroadcasts(campaignId);
-  const setBroadcast = useSetBroadcast(campaignId);
-  const isBroadcasting = Boolean(
-    broadcastKey && broadcasts.data?.find((b) => b.widgetKey === broadcastKey)?.active,
-  );
+  const { active: isBroadcasting, share } = useWidgetBroadcast(campaignId, broadcastKey);
   useEffect(() => {
     if (!isBroadcasting || !broadcastKey) return;
     const id = setTimeout(() => {
-      setBroadcast.mutate({
-        widgetKey: broadcastKey,
-        active: true,
-        payload: { text, title: title || null, color, fontSize },
-      });
+      share({ text, title: title || null, color, fontSize });
     }, 400);
     return () => clearTimeout(id);
-    // setBroadcast is stable from a queryClient closure; intentionally omitted.
+    // `share` is stable from a queryClient closure; intentionally omitted.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isBroadcasting, broadcastKey, text, title, color, fontSize]);
 

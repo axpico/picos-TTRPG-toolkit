@@ -8,6 +8,7 @@ import type {
   UpdatePartyMemberInput,
 } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
+import { useWidgetState } from "../../canvas/useWidgetState.js";
 import { HpBar, InlineConfirm, StatusBadge } from "../shared.js";
 import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
 import { useParty, useUpdatePartyMember } from "../party/api.js";
@@ -35,15 +36,17 @@ function CombatTrackerWidget({ campaignId, state, setState }: WidgetContext) {
   const remove = useDeleteEncounter(campaignId);
   const [newName, setNewName] = useState("");
 
-  const selectedId = (state?.selectedEncounterId as string | undefined) ?? null;
-  const advanceWorldTime = state?.advanceWorldTime === true;
+  const [{ selectedEncounterId: selectedId, advanceWorldTime }, patch] = useWidgetState(
+    { state, setState },
+    { selectedEncounterId: null as string | null, advanceWorldTime: false },
+  );
   const selected =
     list.data?.find((e) => e.id === selectedId) ??
     list.data?.find((e) => e.active) ??
     list.data?.[0] ??
     null;
 
-  const setSelected = (id: string) => setState({ selectedEncounterId: id });
+  const setSelected = (id: string) => patch({ selectedEncounterId: id });
 
   const doCreate = () => {
     const name = newName.trim();
@@ -91,7 +94,7 @@ function CombatTrackerWidget({ campaignId, state, setState }: WidgetContext) {
           encounter={selected}
           campaignId={campaignId}
           advanceWorldTime={advanceWorldTime}
-          onToggleAdvanceWorldTime={(v) => setState({ advanceWorldTime: v })}
+          onToggleAdvanceWorldTime={(v) => patch({ advanceWorldTime: v })}
           onDelete={() => remove.mutate(selected.id)}
         />
       ) : (

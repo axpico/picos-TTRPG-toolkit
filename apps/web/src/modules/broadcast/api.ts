@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Broadcast } from "@toolkit/shared";
 import { api } from "../../api/client.js";
@@ -36,6 +37,38 @@ export function useSetBroadcasts(campaignId: string) {
       qc.invalidateQueries({ queryKey: ["player", campaignId] });
     },
   });
+}
+
+/**
+ * One-stop hook for a single widget's broadcast slot. Reads whether the slot is
+ * currently live, exposes its payload, and offers `share`/`stop` helpers — so
+ * widgets stop re-implementing the "find my broadcast → read payload →
+ * setBroadcast" dance. `share()` always activates the slot; pass the
+ * widget-specific payload (e.g. `{ monsterId }`, or the full sticky state).
+ */
+export function useWidgetBroadcast(campaignId: string, broadcastKey: string | undefined) {
+  const broadcasts = useBroadcasts(campaignId);
+  const setBroadcast = useSetBroadcast(campaignId);
+
+  const current = broadcastKey
+    ? broadcasts.data?.find((b) => b.widgetKey === broadcastKey)
+    : undefined;
+  const active = Boolean(current?.active);
+  const payload = (current?.payload ?? {}) as Record<string, unknown>;
+
+  const share = useCallback(
+    (next?: Record<string, unknown>) => {
+      if (!broadcastKey) return;
+      setBroadcast.mutate({ widgetKey: broadcastKey, active: true, payload: next });
+    },
+    [broadcastKey, setBroadcast],
+  );
+  const stop = useCallback(() => {
+    if (!broadcastKey) return;
+    setBroadcast.mutate({ widgetKey: broadcastKey, active: false });
+  }, [broadcastKey, setBroadcast]);
+
+  return { active, payload, share, stop, isPending: setBroadcast.isPending };
 }
 
 /** Live count of players watching the shared player view. */

@@ -91,6 +91,43 @@ export function ScopeToggle({
   );
 }
 
+/**
+ * Top-level tab strip shared by the library widgets (Bestiary, NPCs, …). Gives
+ * every widget the same tab row height, divider and active styling instead of
+ * each re-implementing the same `<nav><button>` markup.
+ */
+export function Tabs<T extends string>({
+  value,
+  onChange,
+  options,
+  className,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: ReadonlyArray<{ value: T; label: ReactNode }>;
+  className?: string;
+}) {
+  return (
+    <nav
+      role="tablist"
+      className={clsx("flex gap-1 border-b border-ink-700 px-2 py-1.5 text-sm", className)}
+    >
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="tab"
+          aria-selected={value === o.value}
+          className={clsx("btn px-3", value === o.value ? "btn-primary" : "btn-ghost")}
+          onClick={() => onChange(o.value)}
+        >
+          {o.label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
 /** Search box with a leading icon and a clear (×) button when non-empty. */
 export function SearchInput({
   value,

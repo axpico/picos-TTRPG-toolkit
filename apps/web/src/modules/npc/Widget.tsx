@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { sampleNpcs, type CreateNpcInput, type GeneratedNpc, type NPC } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
-import { InlineConfirm, ScopeToggle, SearchInput } from "../shared.js";
+import { useWidgetState } from "../../canvas/useWidgetState.js";
+import { EmptyState } from "../../components/EmptyState.js";
+import { InlineConfirm, ScopeToggle, SearchInput, Tabs } from "../shared.js";
 import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
-import { useBroadcasts, useSetBroadcast } from "../broadcast/api.js";
+import { useWidgetBroadcast } from "../broadcast/api.js";
 import {
   useCreateNpc,
   useDeleteNpc,
@@ -25,25 +27,19 @@ const CULTURES = [
 type Tab = "library" | "generator";
 
 function NpcLibraryWidget({ campaignId, state, setState, broadcastKey }: WidgetContext) {
-  const tab = (state?.tab as Tab | undefined) ?? "library";
-  const setTab = (t: Tab) => setState({ tab: t });
+  const [{ tab }, patch] = useWidgetState({ state, setState }, { tab: "library" as Tab });
+  const setTab = (t: Tab) => patch({ tab: t });
 
   return (
     <div className="flex h-full flex-col">
-      <nav className="flex gap-1 border-b border-ink-700 px-2 py-1.5 text-sm">
-        <button
-          className={clsx("btn px-3", tab === "library" ? "btn-primary" : "btn-ghost")}
-          onClick={() => setTab("library")}
-        >
-          Library
-        </button>
-        <button
-          className={clsx("btn px-3", tab === "generator" ? "btn-primary" : "btn-ghost")}
-          onClick={() => setTab("generator")}
-        >
-          Generator
-        </button>
-      </nav>
+      <Tabs
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: "library", label: "Library" },
+          { value: "generator", label: "Generator" },
+        ]}
+      />
       {tab === "library" ? (
         <LibraryTab campaignId={campaignId} broadcastKey={broadcastKey} />
       ) : (
@@ -72,16 +68,10 @@ function LibraryTab({ campaignId, broadcastKey }: { campaignId: string; broadcas
   const create = useCreateNpc();
 
   // Spotlight: share a single NPC to players via the widget's broadcast key.
-  const key = broadcastKey ?? "npc";
-  const broadcasts = useBroadcasts(campaignId);
-  const setBroadcast = useSetBroadcast(campaignId);
-  const current = broadcasts.data?.find((b) => b.widgetKey === key);
+  const { active, payload, share } = useWidgetBroadcast(campaignId, broadcastKey ?? "npc");
   const sharedNpcId =
-    current?.active && typeof current.payload?.npcId === "string"
-      ? (current.payload.npcId as string)
-      : null;
-  const shareNpc = (npcId: string) =>
-    setBroadcast.mutate({ widgetKey: key, active: true, payload: { npcId } });
+    active && typeof payload.npcId === "string" ? (payload.npcId as string) : null;
+  const shareNpc = (npcId: string) => share({ npcId });
 
   const count = list.data?.length ?? 0;
 
@@ -150,14 +140,12 @@ function LibraryTab({ campaignId, broadcastKey }: { campaignId: string; broadcas
           />
         ))}
         {!list.isLoading && count === 0 && (
-          <li className="flex flex-col items-center gap-1 py-10 text-center">
-            <span className="text-2xl opacity-40">🧑‍🤝‍🧑</span>
-            <span className="text-sm text-ink-400">No NPCs match your filters.</span>
-            <span className="text-xs text-ink-400">
-              Use <span className="text-ink-300">+ Add</span>, the{" "}
-              <span className="text-ink-300">Generator</span>, or{" "}
-              <span className="text-ink-300">Samples</span>.
-            </span>
+          <li className="px-2 py-6">
+            <EmptyState
+              icon="🧑‍🤝‍🧑"
+              title="No NPCs match your filters."
+              description="Use + Add, the Generator, or Samples."
+            />
           </li>
         )}
       </ul>

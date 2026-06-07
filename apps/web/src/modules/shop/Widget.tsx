@@ -2,13 +2,14 @@ import { useMemo, useState } from "react";
 import clsx from "clsx";
 import type { GenerateShopInput, PartyMember, Shop, ShopItem } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
+import { useWidgetState } from "../../canvas/useWidgetState.js";
 import { EmptyState } from "../../components/EmptyState.js";
 import { Markdown } from "../../components/Markdown.js";
 import { useConfirm } from "../../components/ConfirmDialog.js";
 import { useToast } from "../../components/Toast.js";
 import { InlineConfirm } from "../shared.js";
 import { useParty } from "../party/api.js";
-import { useBroadcasts, useSetBroadcast } from "../broadcast/api.js";
+import { useWidgetBroadcast } from "../broadcast/api.js";
 import { ITEM_TYPES, RARITIES, fmtPrice, rarityColor } from "./constants.js";
 import {
   useCreateShop,
@@ -27,11 +28,14 @@ function ShopWidget({ campaignId, state, setState, broadcastKey }: WidgetContext
   const create = useCreateShop(campaignId);
   const remove = useDeleteShop(campaignId);
 
-  const selectedId = (state?.selectedShopId as string | undefined) ?? null;
+  const [{ selectedShopId }, patch] = useWidgetState(
+    { state, setState },
+    { selectedShopId: null as string | null },
+  );
   const selected =
-    list.data?.find((s) => s.id === selectedId) ?? list.data?.[0] ?? null;
+    list.data?.find((s) => s.id === selectedShopId) ?? list.data?.[0] ?? null;
 
-  const select = (id: string | null) => setState({ selectedShopId: id });
+  const select = (id: string | null) => patch({ selectedShopId: id });
 
   return (
     <div className="flex h-full flex-col">
@@ -103,13 +107,9 @@ function ShopEditor({ shop, campaignId, broadcastKey, onDelete }: EditorProps) {
   const party = useParty(campaignId);
 
   // Spotlight: share this shop's stock to players via the widget's broadcast key.
-  const key = broadcastKey ?? "shop";
-  const broadcasts = useBroadcasts(campaignId);
-  const setBroadcast = useSetBroadcast(campaignId);
-  const current = broadcasts.data?.find((b) => b.widgetKey === key);
-  const shared = Boolean(current?.active) && current?.payload?.shopId === shop.id;
-  const shareShop = () =>
-    setBroadcast.mutate({ widgetKey: key, active: true, payload: { shopId: shop.id } });
+  const { active, payload, share } = useWidgetBroadcast(campaignId, broadcastKey ?? "shop");
+  const shared = active && payload.shopId === shop.id;
+  const shareShop = () => share({ shopId: shop.id });
 
   const confirm = useConfirm();
   const toast = useToast();
@@ -496,10 +496,11 @@ function Generator({ campaignId, onCreated }: GeneratorProps) {
 }
 
 registerWidget({
+  // No fixed broadcastKey: each Shop widget shares under its own per-instance key
+  // (`shop:${instanceId}`), so two open shops can spotlight different stock at once.
   type: "shop",
   title: "Shops",
   defaultSize: { w: 560, h: 440 },
-  broadcastKey: "shop",
   share: "model",
   Component: ShopWidget,
 });

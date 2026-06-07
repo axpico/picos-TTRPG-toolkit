@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import type { ExternalLink, SessionEntry } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
+import { useWidgetState } from "../../canvas/useWidgetState.js";
 import { EmptyState } from "../../components/EmptyState.js";
 import { Markdown } from "../../components/Markdown.js";
 import { useConfirm } from "../../components/ConfirmDialog.js";
 import { useToast } from "../../components/Toast.js";
 import { copyText } from "../../lib/clipboard.js";
-import { useBroadcasts, useSetBroadcast } from "../broadcast/api.js";
+import { useWidgetBroadcast } from "../broadcast/api.js";
 import {
   useCreateSession,
   useDeleteSession,
@@ -45,25 +46,22 @@ function SessionsWidget({ campaignId, state, setState, broadcastKey }: WidgetCon
   const [sort, setSort] = useState<SortMode>("date");
   const list = useSessions(campaignId, q.trim() || undefined);
   const create = useCreateSession(campaignId);
-  const selectedId = (state?.selectedSessionId as string | undefined) ?? null;
+  const [{ selectedSessionId: selectedId }, patch] = useWidgetState(
+    { state, setState },
+    { selectedSessionId: null as string | null },
+  );
   const detail = useSession(campaignId, selectedId);
   const update = useUpdateSession(campaignId);
   const remove = useDeleteSession(campaignId);
   const confirm = useConfirm();
 
   // Spotlight: share one session/handout to players via the widget's broadcast key.
-  const key = broadcastKey ?? "sessions";
-  const broadcasts = useBroadcasts(campaignId);
-  const setBroadcast = useSetBroadcast(campaignId);
-  const currentBroadcast = broadcasts.data?.find((b) => b.widgetKey === key);
+  const { active, payload, share } = useWidgetBroadcast(campaignId, broadcastKey ?? "sessions");
   const sharedNoteId =
-    currentBroadcast?.active && typeof currentBroadcast.payload?.noteId === "string"
-      ? (currentBroadcast.payload.noteId as string)
-      : null;
-  const shareSession = (noteId: string) =>
-    setBroadcast.mutate({ widgetKey: key, active: true, payload: { noteId } });
+    active && typeof payload.noteId === "string" ? (payload.noteId as string) : null;
+  const shareSession = (noteId: string) => share({ noteId });
 
-  const selectSession = (id: string | null) => setState({ selectedSessionId: id });
+  const selectSession = (id: string | null) => patch({ selectedSessionId: id });
 
   const sessions = useMemo(() => {
     const items = [...(list.data ?? [])];
