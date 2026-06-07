@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
+import { useBroadcasts, useSetBroadcast } from "../broadcast/api.js";
 
 const COLORS = [
   "#fde68a", // amber
@@ -27,7 +28,7 @@ const FONT_CLASS: Record<FontSize, string> = {
  * font size live in the widget `state` (persisted with the layout), and
  * position/size come from the standard widget frame. No separate model or API.
  */
-function StickyWidget({ state, setState }: WidgetContext) {
+function StickyWidget({ campaignId, state, setState, broadcastKey }: WidgetContext) {
   const text = typeof state?.text === "string" ? state.text : "";
   const title = typeof state?.title === "string" ? state.title : "";
   const color = typeof state?.color === "string" ? state.color : DEFAULT_COLOR;
@@ -35,6 +36,28 @@ function StickyWidget({ state, setState }: WidgetContext) {
     ? (state!.fontSize as FontSize)
     : "md";
   const [showTitle, setShowTitle] = useState(Boolean(title));
+
+  // Sticky notes share their own canvas state (share: "state"): while the GM has
+  // this note broadcasting, push edits into the broadcast payload so the player
+  // view stays in sync. Debounced so typing doesn't hammer the API.
+  const broadcasts = useBroadcasts(campaignId);
+  const setBroadcast = useSetBroadcast(campaignId);
+  const isBroadcasting = Boolean(
+    broadcastKey && broadcasts.data?.find((b) => b.widgetKey === broadcastKey)?.active,
+  );
+  useEffect(() => {
+    if (!isBroadcasting || !broadcastKey) return;
+    const id = setTimeout(() => {
+      setBroadcast.mutate({
+        widgetKey: broadcastKey,
+        active: true,
+        payload: { text, title: title || null, color, fontSize },
+      });
+    }, 400);
+    return () => clearTimeout(id);
+    // setBroadcast is stable from a queryClient closure; intentionally omitted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBroadcasting, broadcastKey, text, title, color, fontSize]);
 
   const cycleFont = () => {
     const idx = FONT_SIZES.indexOf(fontSize);
@@ -112,6 +135,7 @@ registerWidget({
   title: "Sticky Note",
   defaultSize: { w: 240, h: 200 },
   icon: "📝",
+  share: "state",
   Component: StickyWidget,
 });
 

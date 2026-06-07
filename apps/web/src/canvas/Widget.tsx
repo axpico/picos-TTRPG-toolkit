@@ -88,9 +88,8 @@ export function Widget({ campaignId, item }: Props) {
         >
           <span className="display tracking-wide text-ink-50">{def.title}</span>
           <div className="flex items-center gap-1">
-            {def.broadcastKey !== undefined && (
-              <BroadcastToggle campaignId={campaignId} widgetKey={broadcastKey} />
-            )}
+            {/* Every widget is live-shareable; the toggle gates player visibility. */}
+            <BroadcastToggle campaignId={campaignId} widgetKey={broadcastKey} />
             <button
               className="btn-ghost h-7 px-2"
               onClick={() => removeItem(item.instanceId)}

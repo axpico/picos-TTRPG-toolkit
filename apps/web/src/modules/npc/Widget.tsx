@@ -4,6 +4,7 @@ import { sampleNpcs, type CreateNpcInput, type GeneratedNpc, type NPC } from "@t
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { InlineConfirm, ScopeToggle, SearchInput } from "../shared.js";
 import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
+import { useBroadcasts, useSetBroadcast } from "../broadcast/api.js";
 import {
   useCreateNpc,
   useDeleteNpc,
@@ -23,7 +24,7 @@ const CULTURES = [
 
 type Tab = "library" | "generator";
 
-function NpcLibraryWidget({ campaignId, state, setState }: WidgetContext) {
+function NpcLibraryWidget({ campaignId, state, setState, broadcastKey }: WidgetContext) {
   const tab = (state?.tab as Tab | undefined) ?? "library";
   const setTab = (t: Tab) => setState({ tab: t });
 
@@ -44,7 +45,7 @@ function NpcLibraryWidget({ campaignId, state, setState }: WidgetContext) {
         </button>
       </nav>
       {tab === "library" ? (
-        <LibraryTab campaignId={campaignId} />
+        <LibraryTab campaignId={campaignId} broadcastKey={broadcastKey} />
       ) : (
         <GeneratorTab campaignId={campaignId} />
       )}
@@ -52,7 +53,7 @@ function NpcLibraryWidget({ campaignId, state, setState }: WidgetContext) {
   );
 }
 
-function LibraryTab({ campaignId }: { campaignId: string }) {
+function LibraryTab({ campaignId, broadcastKey }: { campaignId: string; broadcastKey?: string }) {
   const [q, setQ] = useState("");
   const [scope, setScope] = useState<"campaign" | "all">("campaign");
   const [onlyFavorites, setOnlyFavorites] = useState(false);
@@ -69,6 +70,18 @@ function LibraryTab({ campaignId }: { campaignId: string }) {
   const update = useUpdateNpc();
   const remove = useDeleteNpc();
   const create = useCreateNpc();
+
+  // Spotlight: share a single NPC to players via the widget's broadcast key.
+  const key = broadcastKey ?? "npc";
+  const broadcasts = useBroadcasts(campaignId);
+  const setBroadcast = useSetBroadcast(campaignId);
+  const current = broadcasts.data?.find((b) => b.widgetKey === key);
+  const sharedNpcId =
+    current?.active && typeof current.payload?.npcId === "string"
+      ? (current.payload.npcId as string)
+      : null;
+  const shareNpc = (npcId: string) =>
+    setBroadcast.mutate({ widgetKey: key, active: true, payload: { npcId } });
 
   const count = list.data?.length ?? 0;
 
@@ -129,6 +142,8 @@ function LibraryTab({ campaignId }: { campaignId: string }) {
             key={n.id}
             npc={n}
             campaignId={campaignId}
+            shared={sharedNpcId === n.id}
+            onShare={() => shareNpc(n.id)}
             onChange={(input) => update.mutate({ id: n.id, input })}
             onDelete={() => remove.mutate(n.id)}
             onCopy={(target) => create.mutate({ ...npcToCreateInput(n), campaignId: target })}
@@ -171,13 +186,17 @@ function npcToCreateInput(n: NPC): Omit<CreateNpcInput, "campaignId"> {
 interface NpcRowProps {
   npc: NPC;
   campaignId: string;
+  /** True when this NPC is the one currently spotlighted to players. */
+  shared: boolean;
+  /** Spotlight this NPC to the player view. */
+  onShare: () => void;
   onChange: (input: Parameters<ReturnType<typeof useUpdateNpc>["mutate"]>[0]["input"]) => void;
   onDelete: () => void;
   /** Copy this NPC into the given scope (campaign id, or undefined for the global library). */
   onCopy: (target: string | undefined) => void;
 }
 
-function NpcRow({ npc, campaignId, onChange, onDelete, onCopy }: NpcRowProps) {
+function NpcRow({ npc, campaignId, shared, onShare, onChange, onDelete, onCopy }: NpcRowProps) {
   const [open, setOpen] = useState(false);
   const [sheet, setSheet] = useState(false);
   const [localName, setLocalName] = useState(npc.name);
@@ -254,6 +273,18 @@ function NpcRow({ npc, campaignId, onChange, onDelete, onCopy }: NpcRowProps) {
               ↗ Library
             </button>
           ) : null}
+          <button
+            className={clsx(
+              "btn h-7 px-2 text-xs transition-colors",
+              shared
+                ? "bg-accent-600 text-white hover:bg-accent-500"
+                : "btn-ghost text-ink-300 hover:text-accent-400",
+            )}
+            onClick={onShare}
+            title={shared ? "Currently shown to players" : "Spotlight this NPC to players"}
+          >
+            {shared ? "★ Live" : "Share"}
+          </button>
           <button className="btn-ghost h-7 px-2 text-xs" onClick={() => setSheet(true)} title="Open stat sheet">
             Sheet
           </button>
@@ -538,6 +569,8 @@ registerWidget({
   type: "npc",
   title: "NPC Library",
   defaultSize: { w: 480, h: 460 },
+  broadcastKey: "npc",
+  share: "model",
   Component: NpcLibraryWidget,
 });
 

@@ -8,6 +8,7 @@ import { useConfirm } from "../../components/ConfirmDialog.js";
 import { useToast } from "../../components/Toast.js";
 import { InlineConfirm } from "../shared.js";
 import { useParty } from "../party/api.js";
+import { useBroadcasts, useSetBroadcast } from "../broadcast/api.js";
 import { ITEM_TYPES, RARITIES, fmtPrice, rarityColor } from "./constants.js";
 import {
   useCreateShop,
@@ -21,7 +22,7 @@ import {
   useUpdateShopItem,
 } from "./api.js";
 
-function ShopWidget({ campaignId, state, setState }: WidgetContext) {
+function ShopWidget({ campaignId, state, setState, broadcastKey }: WidgetContext) {
   const list = useShops(campaignId);
   const create = useCreateShop(campaignId);
   const remove = useDeleteShop(campaignId);
@@ -76,6 +77,7 @@ function ShopWidget({ campaignId, state, setState }: WidgetContext) {
           key={selected.id}
           shop={selected}
           campaignId={campaignId}
+          broadcastKey={broadcastKey}
           onDelete={() => remove.mutate(selected.id, { onSuccess: () => select(null) })}
         />
       ) : (
@@ -88,16 +90,27 @@ function ShopWidget({ campaignId, state, setState }: WidgetContext) {
 interface EditorProps {
   shop: Shop;
   campaignId: string;
+  broadcastKey?: string;
   onDelete: () => void;
 }
 
-function ShopEditor({ shop, campaignId, onDelete }: EditorProps) {
+function ShopEditor({ shop, campaignId, broadcastKey, onDelete }: EditorProps) {
   const updateShop = useUpdateShop(campaignId);
   const addItem = useCreateShopItem(campaignId);
   const updateItem = useUpdateShopItem(campaignId);
   const removeItem = useDeleteShopItem(campaignId);
   const purchase = usePurchaseItem(campaignId);
   const party = useParty(campaignId);
+
+  // Spotlight: share this shop's stock to players via the widget's broadcast key.
+  const key = broadcastKey ?? "shop";
+  const broadcasts = useBroadcasts(campaignId);
+  const setBroadcast = useSetBroadcast(campaignId);
+  const current = broadcasts.data?.find((b) => b.widgetKey === key);
+  const shared = Boolean(current?.active) && current?.payload?.shopId === shop.id;
+  const shareShop = () =>
+    setBroadcast.mutate({ widgetKey: key, active: true, payload: { shopId: shop.id } });
+
   const confirm = useConfirm();
   const toast = useToast();
   const [newItem, setNewItem] = useState("");
@@ -170,6 +183,18 @@ function ShopEditor({ shop, campaignId, onDelete }: EditorProps) {
             updateShop.mutate({ id: shop.id, input: { name: e.target.value } })
           }
         />
+        <button
+          className={clsx(
+            "btn h-7 px-2 text-xs transition-colors",
+            shared
+              ? "bg-accent-600 text-white hover:bg-accent-500"
+              : "btn-ghost text-ink-300 hover:text-accent-400",
+          )}
+          onClick={shareShop}
+          title={shared ? "Currently shown to players" : "Share this shop's stock to players"}
+        >
+          {shared ? "★ Live" : "Share"}
+        </button>
         <InlineConfirm onConfirm={onDelete} title="Delete shop" />
       </header>
 
@@ -474,6 +499,8 @@ registerWidget({
   type: "shop",
   title: "Shops",
   defaultSize: { w: 560, h: 440 },
+  broadcastKey: "shop",
+  share: "model",
   Component: ShopWidget,
 });
 

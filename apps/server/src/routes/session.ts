@@ -79,6 +79,12 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
       },
     });
     const dto = toSessionDto(updated);
+    app.bus.emit(id, {
+      type: "sessions.update",
+      campaignId: id,
+      broadcastKey: "sessions",
+      payload: { noteId: dto.id },
+    });
     await writeLog(app, id, "session.update", `Updated session: ${dto.title}`);
     return dto;
   });

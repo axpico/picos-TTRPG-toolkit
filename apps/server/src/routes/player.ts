@@ -19,6 +19,29 @@ import { toDiceDto } from "../lib/repos/dice.js";
 import { canManageCharacter } from "../lib/auth.js";
 import { openSse } from "../plugins/sse.js";
 import { writeLog } from "../services/log.js";
+import { getProjector } from "../share/registry.js";
+
+/** Widget keys that have a dedicated `data` field below; the generic share loop skips them. */
+const NATIVE_KEYS = new Set([
+  "party",
+  "combat",
+  "weather",
+  "calendar",
+  "map:current",
+  "rolltable:current",
+  "clocks",
+  "timers",
+  "dice",
+]);
+
+function safeJson(raw: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
 
 const idParams = z.object({ id: z.string().min(1) });
 
@@ -95,9 +118,29 @@ export const playerRoutes: FastifyPluginAsync = async (app) => {
           : Promise.resolve([]),
       ]);
 
+    // Generic share engine: every other active broadcast whose module type has a
+    // registered projector is projected to a player-safe payload here.
+    const widgetEntries = await Promise.all(
+      broadcasts
+        .filter((b) => !NATIVE_KEYS.has(b.widgetKey))
+        .map(async (b) => {
+          const type = b.widgetKey.split(":")[0] ?? b.widgetKey;
+          const project = getProjector(type);
+          if (!project) return null;
+          try {
+            const data = await project(campaignId, safeJson(b.payloadJson));
+            return data == null ? null : { widgetKey: b.widgetKey, type, data };
+          } catch {
+            return null;
+          }
+        }),
+    );
+    const widgets = widgetEntries.filter((e): e is NonNullable<typeof e> => e !== null);
+
     return {
       campaign: { id: campaign.id, name: campaign.name },
       broadcasts: broadcasts.map(toBroadcastDto),
+      widgets,
       data: {
         party: active.has("party") ? party.map(toPartyDto) : null,
         combat: active.has("combat") && activeEncounter ? toEncounterDto(activeEncounter) : null,
@@ -142,9 +185,15 @@ export const playerRoutes: FastifyPluginAsync = async (app) => {
       }
       return filter(event);
     });
+    // Count this watcher so the GM dashboard can show live presence.
+    const untrack = app.bus.trackPresence(campaignId);
 
-    req.raw.on("close", unsubscribe);
-    req.raw.on("error", unsubscribe);
+    const cleanup = () => {
+      untrack();
+      unsubscribe();
+    };
+    req.raw.on("close", cleanup);
+    req.raw.on("error", cleanup);
     return reply;
   });
 

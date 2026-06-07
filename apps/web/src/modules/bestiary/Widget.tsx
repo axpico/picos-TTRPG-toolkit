@@ -11,6 +11,7 @@ import {
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { InlineConfirm, MetaChip, ScopeToggle, SearchInput } from "../shared.js";
 import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
+import { useBroadcasts, useSetBroadcast } from "../broadcast/api.js";
 import {
   useCreateMonster,
   useDeleteMonster,
@@ -20,7 +21,7 @@ import {
 
 type Tab = "library" | "generator";
 
-function BestiaryWidget({ campaignId, state, setState }: WidgetContext) {
+function BestiaryWidget({ campaignId, state, setState, broadcastKey }: WidgetContext) {
   const tab = (state?.tab as Tab | undefined) ?? "library";
   const setTab = (t: Tab) => setState({ tab: t });
   return (
@@ -40,7 +41,7 @@ function BestiaryWidget({ campaignId, state, setState }: WidgetContext) {
         </button>
       </nav>
       {tab === "library" ? (
-        <LibraryTab campaignId={campaignId} />
+        <LibraryTab campaignId={campaignId} broadcastKey={broadcastKey} />
       ) : (
         <GeneratorTab campaignId={campaignId} />
       )}
@@ -48,7 +49,7 @@ function BestiaryWidget({ campaignId, state, setState }: WidgetContext) {
   );
 }
 
-function LibraryTab({ campaignId }: { campaignId: string }) {
+function LibraryTab({ campaignId, broadcastKey }: { campaignId: string; broadcastKey?: string }) {
   const [q, setQ] = useState("");
   const [scope, setScope] = useState<"campaign" | "all">("campaign");
   const [type, setType] = useState("");
@@ -69,6 +70,18 @@ function LibraryTab({ campaignId }: { campaignId: string }) {
   const create = useCreateMonster();
   const update = useUpdateMonster();
   const remove = useDeleteMonster();
+
+  // Spotlight: reveal a single creature to players via the widget's broadcast key.
+  const key = broadcastKey ?? "bestiary";
+  const broadcasts = useBroadcasts(campaignId);
+  const setBroadcast = useSetBroadcast(campaignId);
+  const current = broadcasts.data?.find((b) => b.widgetKey === key);
+  const sharedMonsterId =
+    current?.active && typeof current.payload?.monsterId === "string"
+      ? (current.payload.monsterId as string)
+      : null;
+  const shareMonster = (monsterId: string) =>
+    setBroadcast.mutate({ widgetKey: key, active: true, payload: { monsterId } });
 
   const count = list.data?.length ?? 0;
 
@@ -127,6 +140,8 @@ function LibraryTab({ campaignId }: { campaignId: string }) {
             key={m.id}
             monster={m}
             campaignId={campaignId}
+            shared={sharedMonsterId === m.id}
+            onShare={() => shareMonster(m.id)}
             onChange={(input) => update.mutate({ id: m.id, input })}
             onDelete={() => remove.mutate(m.id)}
             onCopy={(target) =>
@@ -165,13 +180,17 @@ function monsterToCreateInput(m: Monster): Omit<CreateMonsterInput, "campaignId"
 interface RowProps {
   monster: Monster;
   campaignId: string;
+  /** True when this creature is the one currently revealed to players. */
+  shared: boolean;
+  /** Reveal this creature to the player view. */
+  onShare: () => void;
   onChange: (input: Parameters<ReturnType<typeof useUpdateMonster>["mutate"]>[0]["input"]) => void;
   onDelete: () => void;
   /** Copy this creature into the given scope (campaign id, or undefined for the global library). */
   onCopy: (target: string | undefined) => void;
 }
 
-function MonsterRow({ monster, campaignId, onChange, onDelete, onCopy }: RowProps) {
+function MonsterRow({ monster, campaignId, shared, onShare, onChange, onDelete, onCopy }: RowProps) {
   const [open, setOpen] = useState(false);
   const [sheet, setSheet] = useState(false);
   const [localName, setLocalName] = useState(monster.name);
@@ -225,6 +244,18 @@ function MonsterRow({ monster, campaignId, onChange, onDelete, onCopy }: RowProp
         )}
         <div className="flex shrink-0 items-center gap-0.5">
           <CopyButton isLibrary={isLibrary} sameCampaign={monster.campaignId === campaignId} onCopy={onCopy} campaignId={campaignId} />
+          <button
+            className={clsx(
+              "btn h-7 px-2 text-xs transition-colors",
+              shared
+                ? "bg-accent-600 text-white hover:bg-accent-500"
+                : "btn-ghost text-ink-300 hover:text-accent-400",
+            )}
+            onClick={onShare}
+            title={shared ? "Currently shown to players" : "Reveal this creature to players"}
+          >
+            {shared ? "★ Live" : "Share"}
+          </button>
           <button
             className="btn-ghost h-7 px-2 text-xs"
             onClick={() => setSheet(true)}
@@ -474,6 +505,8 @@ registerWidget({
   type: "bestiary",
   title: "Bestiary",
   defaultSize: { w: 480, h: 440 },
+  broadcastKey: "bestiary",
+  share: "model",
   Component: BestiaryWidget,
 });
 

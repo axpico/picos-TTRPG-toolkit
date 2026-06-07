@@ -87,6 +87,12 @@ export const monsterRoutes: FastifyPluginAsync = async (app) => {
     });
     const dto = toMonsterDto(updated);
     if (dto.campaignId) {
+      app.bus.emit(dto.campaignId, {
+        type: "bestiary.update",
+        campaignId: dto.campaignId,
+        broadcastKey: "bestiary",
+        payload: { monsterId: dto.id },
+      });
       await writeLog(app, dto.campaignId, "monster.update", `Updated creature: ${dto.name}`);
     }
     return dto;

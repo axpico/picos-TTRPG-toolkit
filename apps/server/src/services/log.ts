@@ -18,9 +18,12 @@ export async function writeLog(
       dataJson: data ? JSON.stringify(data) : null,
     },
   });
+  // Gated by the "log" broadcast: the player Session Log feed only receives
+  // entries while the GM is broadcasting it.
   app.bus.emit(campaignId, {
     type: "log.append",
     campaignId,
+    broadcastKey: "log",
     payload: { entry: toLogDto(row) },
   });
   return row;

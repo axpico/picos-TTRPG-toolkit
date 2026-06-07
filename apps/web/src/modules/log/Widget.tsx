@@ -217,6 +217,8 @@ registerWidget({
   type: "log",
   title: "Session Log",
   defaultSize: { w: 460, h: 320 },
+  broadcastKey: "log",
+  share: "model",
   Component: SessionLogWidget,
 });
 

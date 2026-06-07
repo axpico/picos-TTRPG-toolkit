@@ -7,11 +7,12 @@ import { InfiniteCanvas } from "../canvas/InfiniteCanvas.js";
 import { listWidgets } from "../canvas/WidgetRegistry.js";
 import { WidgetPalette } from "../canvas/WidgetPalette.js";
 import { useCanvasStore } from "../canvas/store.js";
-import { useBroadcast } from "../hooks/useBroadcast.js";
+import { useBroadcast, type ConnectionStatus } from "../hooks/useBroadcast.js";
 import { ThemeControl } from "../theme/ThemePanel.js";
 import { useConfirm } from "../components/ConfirmDialog.js";
 import { useToast } from "../components/Toast.js";
 import { copyText } from "../lib/clipboard.js";
+import { ShareControls } from "../modules/broadcast/ShareControls.js";
 import "../modules/register.js";
 
 function uid() {
@@ -29,8 +30,9 @@ export function CampaignDashboard() {
   const confirm = useConfirm();
   const toast = useToast();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [conn, setConn] = useState<ConnectionStatus>("live");
 
-  useBroadcast({ url: `/api/stream/${campaignId}`, campaignId });
+  useBroadcast({ url: `/api/stream/${campaignId}`, campaignId, onStatus: setConn });
 
   // Global shortcut: "/" or Cmd/Ctrl-K opens the widget palette.
   useEffect(() => {
@@ -116,6 +118,16 @@ export function CampaignDashboard() {
           <button className="btn-primary" onClick={() => setPaletteOpen(true)} title="Add widget (press / or ⌘K)">
             + Add widget
           </button>
+          <div className="mx-1 h-5 w-px bg-ink-700" />
+          <ShareControls campaignId={c.id} />
+          {conn === "reconnecting" && (
+            <span
+              className="chip border-amber-600/50 bg-amber-900/30 text-amber-300"
+              title="Lost the live connection — retrying"
+            >
+              ⟳ Reconnecting…
+            </span>
+          )}
           <div className="mx-1 h-5 w-px bg-ink-700" />
           {c.joinCode && (
             <button

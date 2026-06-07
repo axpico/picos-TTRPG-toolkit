@@ -52,6 +52,8 @@ function buildApp() {
   const bus: SseBus = {
     emit: (campaignId, event) => emitted.push({ campaignId, event: event as never }),
     subscribe: () => () => {},
+    presence: () => 0,
+    trackPresence: () => () => {},
   };
   app.decorate("bus", bus);
   return app;

@@ -8,6 +8,7 @@ import type {
   ProgressClock,
   PublicLocation,
   RollTableResult,
+  ShareEntry,
   Timer,
   UpdateMyCharacterInput,
   Weather,
@@ -28,6 +29,8 @@ export interface PlayerState {
     timers: Timer[] | null;
     dice: DiceRoll[] | null;
   };
+  /** Generic share-engine widgets (npc, bestiary, shop, sessions, log, sticky, …). */
+  widgets: ShareEntry[];
 }
 
 export function usePlayerState(campaignId: string) {

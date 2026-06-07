@@ -12,6 +12,7 @@ import { Skeleton } from "../components/Skeleton.js";
 import { usePlayerState } from "./usePlayer.js";
 import { PlayerDock } from "./PlayerDock.js";
 import { MapStage } from "./MapStage.js";
+import { getShareRenderer } from "./shareRenderers.js";
 import { formatClock, formatDayPhase, formatGameDate } from "./format.js";
 import { formatDuration, remainingSeconds } from "../modules/timers/util.js";
 import type { Timer } from "@toolkit/shared";
@@ -128,6 +129,7 @@ function StageContent({
   myId: string | undefined;
 }) {
   const { calendar, weather, rolltable, map, combat, party, clocks, timers, dice } = s.data;
+  const widgets = s.widgets ?? [];
   const anyActive = s.broadcasts.some((b) => b.active);
 
   if (!anyActive) {
@@ -307,6 +309,12 @@ function StageContent({
           </ul>
         </section>
       )}
+
+      {/* Generic share-engine widgets (npc, bestiary, shop, sessions, log, sticky, …) */}
+      {widgets.map((w) => {
+        const Renderer = getShareRenderer(w.type);
+        return <Renderer key={w.widgetKey} data={w.data} widgetKey={w.widgetKey} />;
+      })}
     </>
   );
 }

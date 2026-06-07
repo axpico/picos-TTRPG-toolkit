@@ -3,7 +3,15 @@ import { render, screen, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { getWidget } from "../../../src/canvas/WidgetRegistry.js";
 
-// Sticky has no API — text/color/title/fontSize live in widget state.
+// Sticky's content lives in widget state; sharing reads the broadcast api, mocked
+// here so the widget mounts without a QueryClient.
+vi.mock("../../../src/modules/broadcast/api.js", () => ({
+  useBroadcasts: () => ({ data: [] }),
+  useSetBroadcast: () => ({ mutate: vi.fn(), isPending: false }),
+  useSetBroadcasts: () => ({ mutate: vi.fn(), isPending: false }),
+  usePresence: () => ({ data: { count: 0 } }),
+}));
+
 await import("../../../src/modules/sticky/Widget.js");
 const StickyWidget = getWidget("sticky")!.Component;
 

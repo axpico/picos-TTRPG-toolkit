@@ -16,6 +16,10 @@ export interface SseBus {
     reply: FastifyReply,
     filter?: (e: SSEEvent) => boolean,
   ): () => void;
+  /** Current number of connected player-stream watchers for a campaign. */
+  presence(campaignId: string): number;
+  /** Register a player watcher; emits `presence.change` and returns a disposer. */
+  trackPresence(campaignId: string): () => void;
 }
 
 const HEARTBEAT_MS = 15_000;
@@ -30,9 +34,37 @@ const plugin: FastifyPluginAsync = async (app: FastifyInstance) => {
   // Many simultaneous SSE listeners are normal; suppress Node's default cap.
   emitter.setMaxListeners(0);
 
+  // Live count of connected player-stream watchers, keyed by campaign.
+  const presenceCounts = new Map<string, number>();
+
   const bus: SseBus = {
     emit(campaignId, event) {
       emitter.emit(`campaign:${campaignId}`, event);
+    },
+    presence(campaignId) {
+      return presenceCounts.get(campaignId) ?? 0;
+    },
+    trackPresence(campaignId) {
+      const next = (presenceCounts.get(campaignId) ?? 0) + 1;
+      presenceCounts.set(campaignId, next);
+      bus.emit(campaignId, {
+        type: "presence.change",
+        campaignId,
+        payload: { count: next },
+      });
+      let disposed = false;
+      return () => {
+        if (disposed) return;
+        disposed = true;
+        const remaining = Math.max(0, (presenceCounts.get(campaignId) ?? 1) - 1);
+        if (remaining === 0) presenceCounts.delete(campaignId);
+        else presenceCounts.set(campaignId, remaining);
+        bus.emit(campaignId, {
+          type: "presence.change",
+          campaignId,
+          payload: { count: remaining },
+        });
+      };
     },
     subscribe(campaignId, reply, filter) {
       const channel = `campaign:${campaignId}`;

@@ -7,6 +7,7 @@ import { Markdown } from "../../components/Markdown.js";
 import { useConfirm } from "../../components/ConfirmDialog.js";
 import { useToast } from "../../components/Toast.js";
 import { copyText } from "../../lib/clipboard.js";
+import { useBroadcasts, useSetBroadcast } from "../broadcast/api.js";
 import {
   useCreateSession,
   useDeleteSession,
@@ -39,7 +40,7 @@ function isValidHref(href: string): boolean {
   return /^[a-z][a-z0-9+.-]*:/i.test(v);
 }
 
-function SessionsWidget({ campaignId, state, setState }: WidgetContext) {
+function SessionsWidget({ campaignId, state, setState, broadcastKey }: WidgetContext) {
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<SortMode>("date");
   const list = useSessions(campaignId, q.trim() || undefined);
@@ -49,6 +50,18 @@ function SessionsWidget({ campaignId, state, setState }: WidgetContext) {
   const update = useUpdateSession(campaignId);
   const remove = useDeleteSession(campaignId);
   const confirm = useConfirm();
+
+  // Spotlight: share one session/handout to players via the widget's broadcast key.
+  const key = broadcastKey ?? "sessions";
+  const broadcasts = useBroadcasts(campaignId);
+  const setBroadcast = useSetBroadcast(campaignId);
+  const currentBroadcast = broadcasts.data?.find((b) => b.widgetKey === key);
+  const sharedNoteId =
+    currentBroadcast?.active && typeof currentBroadcast.payload?.noteId === "string"
+      ? (currentBroadcast.payload.noteId as string)
+      : null;
+  const shareSession = (noteId: string) =>
+    setBroadcast.mutate({ widgetKey: key, active: true, payload: { noteId } });
 
   const selectSession = (id: string | null) => setState({ selectedSessionId: id });
 
@@ -158,6 +171,8 @@ function SessionsWidget({ campaignId, state, setState }: WidgetContext) {
             key={detail.data.id}
             session={detail.data}
             saving={update.isPending}
+            shared={sharedNoteId === detail.data.id}
+            onShare={() => shareSession(detail.data!.id)}
             onChange={(input) => update.mutate({ id: detail.data!.id, input })}
             onDelete={handleDelete}
           />
@@ -178,11 +193,15 @@ function SessionsWidget({ campaignId, state, setState }: WidgetContext) {
 interface EditorProps {
   session: SessionEntry;
   saving: boolean;
+  /** True when this session is the one currently shared to players. */
+  shared: boolean;
+  /** Share this session/handout to the player view. */
+  onShare: () => void;
   onChange: (input: Parameters<ReturnType<typeof useUpdateSession>["mutate"]>[0]["input"]) => void;
   onDelete: () => void;
 }
 
-function SessionEditor({ session, saving, onChange, onDelete }: EditorProps) {
+function SessionEditor({ session, saving, shared, onShare, onChange, onDelete }: EditorProps) {
   // Local-controlled fields with commit on blur to avoid hammering the API.
   const [title, setTitle] = useState(session.title);
   const [summary, setSummary] = useState(session.summary ?? "");
@@ -221,6 +240,18 @@ function SessionEditor({ session, saving, onChange, onDelete }: EditorProps) {
         <span className="w-14 shrink-0 text-right text-[10px] uppercase tracking-wide text-ink-400">
           {saving ? "saving…" : "saved"}
         </span>
+        <button
+          className={clsx(
+            "btn h-7 shrink-0 px-2 text-xs transition-colors",
+            shared
+              ? "bg-accent-600 text-white hover:bg-accent-500"
+              : "btn-ghost text-ink-300 hover:text-accent-400",
+          )}
+          onClick={onShare}
+          title={shared ? "Currently shown to players" : "Share this handout to players"}
+        >
+          {shared ? "★ Live" : "Share"}
+        </button>
         <input
           type="date"
           className="input w-40"
@@ -367,6 +398,8 @@ registerWidget({
   type: "sessions",
   title: "Sessions / Notes",
   defaultSize: { w: 640, h: 480 },
+  broadcastKey: "sessions",
+  share: "model",
   Component: SessionsWidget,
 });
 

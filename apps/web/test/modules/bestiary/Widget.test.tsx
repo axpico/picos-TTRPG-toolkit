@@ -9,6 +9,13 @@ vi.mock("../../../src/modules/bestiary/api.js", () => ({
   useDeleteMonster: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
+vi.mock("../../../src/modules/broadcast/api.js", () => ({
+  useBroadcasts: () => ({ data: [] }),
+  useSetBroadcast: () => ({ mutate: vi.fn(), isPending: false }),
+  useSetBroadcasts: () => ({ mutate: vi.fn(), isPending: false }),
+  usePresence: () => ({ data: { count: 0 } }),
+}));
+
 await import("../../../src/modules/bestiary/Widget.js");
 const BestiaryWidget = getWidget("bestiary")!.Component;
 

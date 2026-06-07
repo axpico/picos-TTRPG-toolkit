@@ -20,3 +20,26 @@ export const setBroadcastInput = z.object({
   payload: z.record(z.unknown()).optional(),
 });
 export type SetBroadcastInput = z.infer<typeof setBroadcastInput>;
+
+/**
+ * A generic projection entry produced by the share engine: any widget the GM is
+ * broadcasting that has a registered server projector + client renderer. The
+ * existing first-class widgets (party, combat, map, …) keep their dedicated
+ * `PlayerState.data` fields; everything else flows through `widgets`.
+ */
+export const shareEntry = z.object({
+  /** The broadcast key, e.g. "npc" or "sticky:<instanceId>". */
+  widgetKey: z.string(),
+  /** The widget module type (key prefix), e.g. "npc". */
+  type: z.string(),
+  /** Player-safe payload produced by the server projector. */
+  data: z.unknown(),
+});
+export type ShareEntry = z.infer<typeof shareEntry>;
+
+/** Batch broadcast toggle — used by the GM "Share all / Hide all" control. */
+export const setBroadcastsInput = z.object({
+  active: z.boolean(),
+  widgetKeys: z.array(z.string().min(1).max(120)).max(200),
+});
+export type SetBroadcastsInput = z.infer<typeof setBroadcastsInput>;

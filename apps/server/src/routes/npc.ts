@@ -96,6 +96,12 @@ export const npcRoutes: FastifyPluginAsync = async (app) => {
     });
     const dto = toNpcDto(updated);
     if (dto.campaignId) {
+      app.bus.emit(dto.campaignId, {
+        type: "npc.update",
+        campaignId: dto.campaignId,
+        broadcastKey: "npc",
+        payload: { npcId: dto.id },
+      });
       await writeLog(app, dto.campaignId, "npc.update", `Updated NPC: ${dto.name}`);
     }
     return dto;

@@ -25,6 +25,13 @@ vi.mock("../../../src/modules/party/api.js", () => ({
   }),
 }));
 
+vi.mock("../../../src/modules/broadcast/api.js", () => ({
+  useBroadcasts: () => ({ data: [] }),
+  useSetBroadcast: () => ({ mutate: vi.fn(), isPending: false }),
+  useSetBroadcasts: () => ({ mutate: vi.fn(), isPending: false }),
+  usePresence: () => ({ data: { count: 0 } }),
+}));
+
 vi.mock("../../../src/components/Toast.js", () => ({ useToast: () => () => {} }));
 vi.mock("../../../src/components/ConfirmDialog.js", () => ({
   useConfirm: () => () => Promise.resolve(true),

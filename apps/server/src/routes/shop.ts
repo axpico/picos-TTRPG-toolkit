@@ -24,6 +24,15 @@ const itemParams = z.object({
 });
 
 export const shopRoutes: FastifyPluginAsync = async (app) => {
+  // Notify the player view when a shared shop's inventory/details change.
+  const emitShop = (campaignId: string, shopId: string) =>
+    app.bus.emit(campaignId, {
+      type: "shop.update",
+      campaignId,
+      broadcastKey: "shop",
+      payload: { shopId },
+    });
+
   app.get("/:id/shops", async (req) => {
     const { id } = cidParams.parse(req.params);
     const rows = await prisma.shop.findMany({
@@ -66,6 +75,7 @@ export const shopRoutes: FastifyPluginAsync = async (app) => {
       },
       include: { items: true },
     });
+    emitShop(id, shopId);
     await writeLog(app, id, "shop.update", `Updated shop: ${updated.name}`);
     return toShopDto(updated);
   });
@@ -79,7 +89,7 @@ export const shopRoutes: FastifyPluginAsync = async (app) => {
 
   // --- items ---
   app.post("/:id/shops/:shopId/items", async (req, reply) => {
-    const { shopId } = shopParams.parse(req.params);
+    const { id, shopId } = shopParams.parse(req.params);
     const body = createShopItemInput.parse(req.body);
     const created = await prisma.shopItem.create({
       data: {
@@ -92,12 +102,13 @@ export const shopRoutes: FastifyPluginAsync = async (app) => {
         tagsJson: JSON.stringify(body.tags ?? []),
       },
     });
+    emitShop(id, shopId);
     reply.code(201);
     return toShopItemDto(created);
   });
 
   app.patch("/:id/shops/:shopId/items/:itemId", async (req) => {
-    const { itemId } = itemParams.parse(req.params);
+    const { id, shopId, itemId } = itemParams.parse(req.params);
     const body = updateShopItemInput.parse(req.body);
     const updated = await prisma.shopItem.update({
       where: { id: itemId },
@@ -110,12 +121,14 @@ export const shopRoutes: FastifyPluginAsync = async (app) => {
         ...(body.tags !== undefined ? { tagsJson: JSON.stringify(body.tags) } : {}),
       },
     });
+    emitShop(id, shopId);
     return toShopItemDto(updated);
   });
 
   app.delete("/:id/shops/:shopId/items/:itemId", async (req, reply) => {
-    const { itemId } = itemParams.parse(req.params);
+    const { id, shopId, itemId } = itemParams.parse(req.params);
     await prisma.shopItem.delete({ where: { id: itemId } });
+    emitShop(id, shopId);
     reply.code(204).send();
   });
 
@@ -163,6 +176,7 @@ export const shopRoutes: FastifyPluginAsync = async (app) => {
       broadcastKey: "party",
       payload: { member: memberDto },
     });
+    emitShop(id, shopId);
     await writeLog(
       app,
       id,

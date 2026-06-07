@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { setBroadcastInput } from "@toolkit/shared";
+import { setBroadcastInput, setBroadcastsInput } from "@toolkit/shared";
 import { prisma } from "../db.js";
 import { toBroadcastDto } from "../lib/repos/broadcast.js";
 
@@ -10,6 +10,35 @@ const keyParams = z.object({ id: z.string().min(1), widgetKey: z.string().min(1)
 export const broadcastRoutes: FastifyPluginAsync = async (app) => {
   app.get("/:id/broadcasts", async (req) => {
     const { id } = idParams.parse(req.params);
+    const rows = await prisma.broadcast.findMany({ where: { campaignId: id } });
+    return rows.map(toBroadcastDto);
+  });
+
+  // Number of players currently watching the live player view.
+  app.get("/:id/presence", async (req) => {
+    const { id } = idParams.parse(req.params);
+    return { count: app.bus.presence(id) };
+  });
+
+  // Batch toggle (Share All / Hide All). Flips `active` for the given keys in one
+  // call, then emits a single broadcast.change so streams refresh once.
+  app.put("/:id/broadcasts", async (req) => {
+    const { id } = idParams.parse(req.params);
+    const body = setBroadcastsInput.parse(req.body);
+    await prisma.$transaction(
+      body.widgetKeys.map((widgetKey) =>
+        prisma.broadcast.upsert({
+          where: { campaignId_widgetKey: { campaignId: id, widgetKey } },
+          create: { campaignId: id, widgetKey, active: body.active, payloadJson: "{}" },
+          update: { active: body.active },
+        }),
+      ),
+    );
+    app.bus.emit(id, {
+      type: "broadcast.change",
+      campaignId: id,
+      payload: { active: body.active, batch: true },
+    });
     const rows = await prisma.broadcast.findMany({ where: { campaignId: id } });
     return rows.map(toBroadcastDto);
   });

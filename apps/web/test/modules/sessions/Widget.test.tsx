@@ -10,6 +10,13 @@ vi.mock("../../../src/modules/sessions/api.js", () => ({
   useDeleteSession: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
+vi.mock("../../../src/modules/broadcast/api.js", () => ({
+  useBroadcasts: () => ({ data: [] }),
+  useSetBroadcast: () => ({ mutate: vi.fn(), isPending: false }),
+  useSetBroadcasts: () => ({ mutate: vi.fn(), isPending: false }),
+  usePresence: () => ({ data: { count: 0 } }),
+}));
+
 await import("../../../src/modules/sessions/Widget.js");
 const SessionsWidget = getWidget("sessions")!.Component;
 
