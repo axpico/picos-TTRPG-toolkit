@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { WEATHER_PRESETS, weatherIcon, type WeatherTableEntry } from "@toolkit/shared";
+import { DEFAULT_WEATHER_TABLE, WEATHER_PRESETS, weatherIcon, type WeatherTableEntry } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { Skeleton } from "../../components/Skeleton.js";
 import { PendingButton } from "../shared.js";
@@ -76,6 +76,13 @@ function WeatherWidget({ campaignId }: WidgetContext) {
     setTable(next);
     persistTable(next);
   };
+  const appendRows = (rows: WeatherTableEntry[]) => {
+    const next = [...table, ...rows];
+    setTable(next);
+    persistTable(next);
+  };
+  /** Seed the editor with a copy of the built-in table so the GM can tweak it. */
+  const customizeDefault = () => appendRows(DEFAULT_WEATHER_TABLE.map((r) => ({ ...r })));
 
   return (
     <div className="flex h-full flex-col overflow-auto">
@@ -186,8 +193,15 @@ function WeatherWidget({ campaignId }: WidgetContext) {
           </p>
 
           {table.length === 0 ? (
-            <div className="rounded-md border border-dashed border-ink-700 px-3 py-4 text-center text-sm text-ink-400">
-              No custom table — rolls use the built-in default.
+            <div className="space-y-2 rounded-md border border-dashed border-ink-700 px-3 py-4 text-center text-sm text-ink-400">
+              <p>No custom table — rolls use the built-in default.</p>
+              <button
+                className="btn-ghost h-7 text-xs text-accent-400 hover:text-accent-300"
+                onClick={customizeDefault}
+                title="Copy the built-in table here so you can tweak weights and add conditions"
+              >
+                ✎ Customize the default table
+              </button>
             </div>
           ) : (
             <ul className="space-y-1.5">
@@ -226,6 +240,21 @@ function WeatherWidget({ campaignId }: WidgetContext) {
                         {complete ? `${pct}%` : "—"}
                       </span>
                       <button
+                        className="btn-ghost h-7 px-1.5 text-xs text-ink-400 hover:text-accent-400 disabled:opacity-40"
+                        disabled={!complete}
+                        onClick={() =>
+                          commitCurrent({
+                            condition: row.condition,
+                            temperature: row.temperature,
+                            description: row.description,
+                          })
+                        }
+                        title="Make this the current weather"
+                        aria-label={`Set ${row.condition || "row"} as current weather`}
+                      >
+                        ↑ Now
+                      </button>
+                      <button
                         className="btn-ghost h-7 px-2 text-ink-400 hover:text-red-400"
                         onClick={() => removeRow(idx)}
                         title="Remove row"
@@ -256,6 +285,31 @@ function WeatherWidget({ campaignId }: WidgetContext) {
             </ul>
           )}
 
+          {/* Quick-add a preset as a roll-table row (weight 1, then tweak). */}
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-xs text-ink-500">Quick add:</span>
+            {WEATHER_PRESETS.map((p) => (
+              <button
+                key={p.condition}
+                className="btn-ghost h-7 px-1.5 text-base leading-none"
+                onClick={() =>
+                  appendRows([
+                    {
+                      weight: 1,
+                      condition: p.condition,
+                      temperature: p.temperature,
+                      description: p.description,
+                    },
+                  ])
+                }
+                title={`Add "${p.condition}" to the table`}
+                aria-label={`Add ${p.condition} to the table`}
+              >
+                {p.icon}
+              </button>
+            ))}
+          </div>
+
           <div className="flex items-center gap-1">
             <button
               className="btn-ghost h-7 text-xs"
@@ -266,7 +320,7 @@ function WeatherWidget({ campaignId }: WidgetContext) {
                 ])
               }
             >
-              + Add condition
+              + Custom row
             </button>
             {table.length > 0 && (
               <button

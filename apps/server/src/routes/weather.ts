@@ -1,19 +1,11 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { setWeatherInput, type WeatherTableEntry } from "@toolkit/shared";
+import { DEFAULT_WEATHER_TABLE, setWeatherInput, type WeatherTableEntry } from "@toolkit/shared";
 import { prisma } from "../db.js";
 import { toWeatherDto } from "../lib/repos/weather.js";
 import { writeLog } from "../services/log.js";
 
 const cidParams = z.object({ id: z.string().min(1) });
-
-const DEFAULT_TABLE: WeatherTableEntry[] = [
-  { weight: 4, condition: "Clear", temperature: "Mild", description: "Open skies." },
-  { weight: 3, condition: "Cloudy", temperature: "Cool", description: "Layered grey overhead." },
-  { weight: 2, condition: "Rain", temperature: "Cool", description: "Steady, soaking rain." },
-  { weight: 1, condition: "Storm", temperature: "Cold", description: "Wind-driven downpour, distant thunder." },
-  { weight: 1, condition: "Fog", temperature: "Chilled", description: "Visibility drops to a stone's throw." },
-];
 
 function pickFromTable(table: WeatherTableEntry[]): WeatherTableEntry {
   const total = table.reduce((s, e) => s + e.weight, 0);
@@ -78,7 +70,7 @@ export const weatherRoutes: FastifyPluginAsync = async (app) => {
     const { id } = cidParams.parse(req.params);
     const row = await ensureWeather(id);
     const dto = toWeatherDto(row);
-    const table = dto.table && dto.table.length > 0 ? dto.table : DEFAULT_TABLE;
+    const table = dto.table && dto.table.length > 0 ? dto.table : DEFAULT_WEATHER_TABLE;
     const pick = pickFromTable(table);
     const updated = await prisma.weather.update({
       where: { campaignId: id },

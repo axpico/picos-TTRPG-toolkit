@@ -29,6 +29,19 @@ export const setWeatherInput = z.object({
 });
 export type SetWeatherInput = z.infer<typeof setWeatherInput>;
 
+/**
+ * Built-in roll table used when a campaign has no custom table. Exported so the
+ * GM's editor can seed a customizable copy of it (single source of truth with
+ * the server's roll endpoint).
+ */
+export const DEFAULT_WEATHER_TABLE: WeatherTableEntry[] = [
+  { weight: 4, condition: "Clear", temperature: "Mild", description: "Open skies." },
+  { weight: 3, condition: "Cloudy", temperature: "Cool", description: "Layered grey overhead." },
+  { weight: 2, condition: "Rain", temperature: "Cool", description: "Steady, soaking rain." },
+  { weight: 1, condition: "Storm", temperature: "Cold", description: "Wind-driven downpour, distant thunder." },
+  { weight: 1, condition: "Fog", temperature: "Chilled", description: "Visibility drops to a stone's throw." },
+];
+
 /** A quick-set weather preset: an emoji plus the state it applies. */
 export interface WeatherPreset {
   icon: string;
