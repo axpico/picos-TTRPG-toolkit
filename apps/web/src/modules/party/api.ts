@@ -4,6 +4,22 @@ import { api } from "../../api/client.js";
 
 const key = (campaignId: string) => ["party", campaignId] as const;
 
+/** A campaign membership row as returned by GET /campaigns/:id/members (DM only). */
+export interface CampaignMember {
+  userId: string;
+  role: "dm" | "player";
+  user: { id: string; username: string; displayName: string | null };
+}
+
+/** Campaign member accounts, for linking a party member to a player (DM only). */
+export function useCampaignMembers(campaignId: string) {
+  return useQuery({
+    queryKey: ["campaign-members", campaignId],
+    enabled: Boolean(campaignId),
+    queryFn: () => api.get<CampaignMember[]>(`/api/campaigns/${campaignId}/members`),
+  });
+}
+
 export function useParty(campaignId: string) {
   return useQuery({
     queryKey: key(campaignId),

@@ -3,7 +3,8 @@ import clsx from "clsx";
 import type { RollTable, RollTableEntry, RollTableResult } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { useToast } from "../../components/Toast.js";
-import { InlineConfirm } from "../shared.js";
+import { EmptyState } from "../../components/EmptyState.js";
+import { InlineConfirm, PendingButton } from "../shared.js";
 import { copyText } from "../../lib/clipboard.js";
 import { downloadJson, parseTablesImport, serializeTables } from "./io.js";
 import {
@@ -142,15 +143,16 @@ function RollTablesWidget({ campaignId }: WidgetContext) {
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && doCreate()}
         />
-        <button
+        <PendingButton
           className="btn-primary h-9 px-3"
-          disabled={!newName.trim() || create.isPending}
+          pending={create.isPending}
+          disabled={!newName.trim()}
           onClick={doCreate}
           title="Create table"
           aria-label="Create table"
         >
           +
-        </button>
+        </PendingButton>
         <button
           className="btn-ghost h-9 px-2 text-xs text-ink-400"
           onClick={() => setImportOpen((v) => !v)}
@@ -249,10 +251,13 @@ function RollTablesWidget({ campaignId }: WidgetContext) {
             />
           ))
         ) : (
-          <div className="flex h-full items-center justify-center text-center text-sm text-ink-400">
-            No tables yet.
-            <br />
-            Create one for loot, names, rumors, or random events.
+          <div className="flex h-full items-center justify-center">
+            <EmptyState
+              compact
+              icon="📜"
+              title="No tables yet"
+              description="Create one for loot, names, rumors, or random events."
+            />
           </div>
         )}
       </div>

@@ -7,7 +7,7 @@ import { EmptyState } from "../../components/EmptyState.js";
 import { Markdown } from "../../components/Markdown.js";
 import { useConfirm } from "../../components/ConfirmDialog.js";
 import { useToast } from "../../components/Toast.js";
-import { InlineConfirm } from "../shared.js";
+import { InlineConfirm, PendingButton } from "../shared.js";
 import { useParty } from "../party/api.js";
 import { useWidgetBroadcast } from "../broadcast/api.js";
 import { ITEM_TYPES, RARITIES, fmtPrice, rarityColor } from "./constants.js";
@@ -298,14 +298,15 @@ function ShopEditor({ shop, campaignId, broadcastKey, onDelete }: EditorProps) {
           onChange={(e) => setNewItem(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && submitNewItem()}
         />
-        <button
+        <PendingButton
           className="btn-primary px-2"
-          disabled={!newItem.trim() || addItem.isPending}
+          pending={addItem.isPending}
+          disabled={!newItem.trim()}
           onClick={submitNewItem}
           aria-label="Add item"
         >
           +
-        </button>
+        </PendingButton>
       </div>
     </div>
   );
@@ -474,7 +475,7 @@ function Generator({ campaignId, onCreated }: GeneratorProps) {
           <option value="legendary">Cap: legendary</option>
         </select>
       </div>
-      <button
+      <PendingButton
         className="btn-primary"
         onClick={() =>
           generate.mutate(
@@ -487,10 +488,10 @@ function Generator({ campaignId, onCreated }: GeneratorProps) {
             },
           )
         }
-        disabled={generate.isPending}
+        pending={generate.isPending}
       >
         {generate.isPending ? "Generating…" : "Generate"}
-      </button>
+      </PendingButton>
     </div>
   );
 }

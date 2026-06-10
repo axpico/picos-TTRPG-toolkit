@@ -1,10 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App } from "./App.js";
 import { initTheme } from "./theme/useTheme.js";
-import { ToastProvider } from "./components/Toast.js";
+import { globalToast, ToastProvider } from "./components/Toast.js";
 import { ConfirmProvider } from "./components/ConfirmDialog.js";
 import "./theme/tailwind.css";
 
@@ -35,6 +35,16 @@ const queryClient = new QueryClient({
       retry: 1,
     },
   },
+  // Safety net: every mutation without its own onError surfaces a toast, so
+  // failed saves never disappear silently. Opt out with meta.silenceErrorToast.
+  mutationCache: new MutationCache({
+    onError: (error, _variables, _context, mutation) => {
+      if (mutation.meta?.silenceErrorToast) return;
+      if (mutation.options.onError) return;
+      const message = error instanceof Error && error.message ? error.message : "Something went wrong.";
+      globalToast(message, "error");
+    },
+  }),
 });
 
 initTheme();

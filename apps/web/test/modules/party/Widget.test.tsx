@@ -9,6 +9,7 @@ vi.mock("../../../src/modules/party/api.js", () => ({
     data: [
       {
         id: "m1",
+        userId: null,
         name: "Aria",
         playerName: "Sam",
         hp: 10,
@@ -20,6 +21,12 @@ vi.mock("../../../src/modules/party/api.js", () => ({
         stats: {},
         order: 0,
       },
+    ],
+  }),
+  useCampaignMembers: () => ({
+    data: [
+      { userId: "u-dm", role: "dm", user: { id: "u-dm", username: "gm", displayName: null } },
+      { userId: "u-sam", role: "player", user: { id: "u-sam", username: "sam", displayName: "Sam" } },
     ],
   }),
   useCreatePartyMember: () => ({ mutate: vi.fn(), isPending: false }),
@@ -60,5 +67,19 @@ describe("PartyWidget", () => {
     fireEvent.change(gold, { target: { value: "-5" } });
     fireEvent.blur(gold);
     expect(h.updateMutate).toHaveBeenCalledWith({ id: "m1", input: { gold: 0 } });
+  });
+
+  it("links a player account via the 🔗 picker", () => {
+    render(<PartyWidget {...ctx} />);
+    const select = screen.getByLabelText("Linked player account for Aria");
+    fireEvent.change(select, { target: { value: "u-sam" } });
+    expect(h.updateMutate).toHaveBeenCalledWith({ id: "m1", input: { userId: "u-sam" } });
+  });
+
+  it("unlinks by selecting the empty option", () => {
+    render(<PartyWidget {...ctx} />);
+    const select = screen.getByLabelText("Linked player account for Aria");
+    fireEvent.change(select, { target: { value: "" } });
+    expect(h.updateMutate).toHaveBeenCalledWith({ id: "m1", input: { userId: null } });
   });
 });

@@ -3,6 +3,7 @@ import clsx from "clsx";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { EmptyState } from "../../components/EmptyState.js";
 import { useToast } from "../../components/Toast.js";
+import { PendingButton } from "../shared.js";
 import { useAddLogNote, useLog } from "./api.js";
 
 function fmtTime(iso: string) {
@@ -152,13 +153,14 @@ function SessionLogWidget({ campaignId }: WidgetContext) {
           onKeyDown={(e) => e.key === "Enter" && submitNote()}
           autoComplete="off"
         />
-        <button
+        <PendingButton
           className="btn-primary h-6 shrink-0 px-2 py-0 text-xs"
-          disabled={addNote.isPending || !note.trim()}
+          pending={addNote.isPending}
+          disabled={!note.trim()}
           onClick={submitNote}
         >
           Add
-        </button>
+        </PendingButton>
       </div>
 
       <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-auto px-2 py-2 text-sm">

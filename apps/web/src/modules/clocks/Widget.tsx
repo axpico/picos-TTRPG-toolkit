@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import type { ProgressClock, UpdateClockInput } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
-import { InlineConfirm } from "../shared.js";
+import { InlineConfirm, PendingButton } from "../shared.js";
+import { Skeleton } from "../../components/Skeleton.js";
+import { EmptyState } from "../../components/EmptyState.js";
 import { useClocks, useCreateClock, useDeleteClock, useUpdateClock } from "./api.js";
 
 const SEGMENT_OPTIONS = [4, 6, 8, 10, 12] as const;
@@ -112,18 +114,25 @@ function ClocksWidget({ campaignId }: WidgetContext) {
             </button>
           ))}
         </div>
-        <button
+        <PendingButton
           className="btn-primary px-2"
-          disabled={!newName.trim() || create.isPending}
+          pending={create.isPending}
+          disabled={!newName.trim()}
           onClick={doCreate}
+          aria-label="Add clock"
         >
           +
-        </button>
+        </PendingButton>
       </div>
 
       {/* Clock grid */}
       <div className="flex-1 overflow-auto p-2">
-        {clocks.length > 0 ? (
+        {list.isLoading ? (
+          <div className="grid grid-cols-2 gap-2" aria-hidden="true">
+            <Skeleton className="h-44" />
+            <Skeleton className="h-44" />
+          </div>
+        ) : clocks.length > 0 ? (
           <div className="grid grid-cols-2 gap-2">
             {clocks.map((clock, idx) => (
               <ClockCard
@@ -136,10 +145,13 @@ function ClocksWidget({ campaignId }: WidgetContext) {
             ))}
           </div>
         ) : (
-          <div className="flex h-full items-center justify-center text-center text-sm text-ink-400">
-            No clocks yet.
-            <br />
-            Create one to track threats, progress, or countdowns.
+          <div className="flex h-full items-center justify-center">
+            <EmptyState
+              compact
+              icon="🕗"
+              title="No clocks yet"
+              description="Create one to track threats, progress, or countdowns."
+            />
           </div>
         )}
       </div>

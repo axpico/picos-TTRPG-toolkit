@@ -51,6 +51,7 @@ export const partyRoutes: FastifyPluginAsync = async (app) => {
       where: { id: memberId },
       data: {
         ...(body.name !== undefined ? { name: body.name } : {}),
+        ...(body.userId !== undefined ? { userId: body.userId } : {}),
         ...(body.playerName !== undefined ? { playerName: body.playerName ?? null } : {}),
         ...(body.hp !== undefined ? { hp: body.hp } : {}),
         ...(body.hpMax !== undefined ? { hpMax: body.hpMax } : {}),

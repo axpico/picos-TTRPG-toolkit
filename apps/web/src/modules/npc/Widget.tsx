@@ -4,7 +4,8 @@ import { sampleNpcs, type CreateNpcInput, type GeneratedNpc, type NPC } from "@t
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { useWidgetState } from "../../canvas/useWidgetState.js";
 import { EmptyState } from "../../components/EmptyState.js";
-import { InlineConfirm, ScopeToggle, SearchInput, Tabs } from "../shared.js";
+import { Skeleton } from "../../components/Skeleton.js";
+import { InlineConfirm, PendingButton, ScopeToggle, SearchInput, Tabs } from "../shared.js";
 import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
 import { useWidgetBroadcast } from "../broadcast/api.js";
 import {
@@ -127,6 +128,13 @@ function LibraryTab({ campaignId, broadcastKey }: { campaignId: string; broadcas
       </div>
 
       <ul className="flex-1 space-y-1.5 overflow-auto p-2 text-sm">
+        {list.isLoading && (
+          <li aria-hidden="true" className="space-y-1.5">
+            <Skeleton className="h-9" />
+            <Skeleton className="h-9" />
+            <Skeleton className="h-9" />
+          </li>
+        )}
         {list.data?.map((n) => (
           <NpcRow
             key={n.id}
@@ -140,8 +148,9 @@ function LibraryTab({ campaignId, broadcastKey }: { campaignId: string; broadcas
           />
         ))}
         {!list.isLoading && count === 0 && (
-          <li className="px-2 py-6">
+          <li className="px-2 py-2">
             <EmptyState
+              compact
               icon="🧑‍🤝‍🧑"
               title="No NPCs match your filters."
               description="Use + Add, the Generator, or Samples."
@@ -486,13 +495,9 @@ function GeneratorTab({ campaignId }: { campaignId: string }) {
         )}
       </div>
 
-      <button
-        className="btn-primary mt-2"
-        onClick={roll}
-        disabled={generate.isPending}
-      >
+      <PendingButton className="btn-primary mt-2" onClick={roll} pending={generate.isPending}>
         {generate.isPending ? "Rolling…" : "Roll NPCs"}
-      </button>
+      </PendingButton>
 
       <ul className="mt-3 flex-1 space-y-2 overflow-auto">
         {results.map((n, idx) => (
@@ -544,8 +549,8 @@ function GeneratorTab({ campaignId }: { campaignId: string }) {
           </li>
         ))}
         {results.length === 0 && (
-          <li className="flex h-full items-center justify-center py-8 text-center text-ink-400">
-            Choose a culture and roll some NPCs.
+          <li className="py-2">
+            <EmptyState compact icon="🎲" title="Nothing rolled yet" description="Choose a culture and roll some NPCs." />
           </li>
         )}
       </ul>

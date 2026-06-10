@@ -2,13 +2,17 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { sampleParty, type PartyMember, type PartyMemberStatus } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
-import { HpBar, InlineConfirm } from "../shared.js";
+import { HpBar, InlineConfirm, PendingButton } from "../shared.js";
+import { Skeleton } from "../../components/Skeleton.js";
+import { EmptyState } from "../../components/EmptyState.js";
 import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
 import {
+  useCampaignMembers,
   useCreatePartyMember,
   useDeletePartyMember,
   useParty,
   useUpdatePartyMember,
+  type CampaignMember,
 } from "./api.js";
 
 const STATUS_LABEL: Record<PartyMemberStatus, string> = {
@@ -27,6 +31,7 @@ const STATUS_STYLE: Record<PartyMemberStatus, string> = {
 
 function PartyTrackerWidget({ campaignId }: WidgetContext) {
   const list = useParty(campaignId);
+  const members = useCampaignMembers(campaignId);
   const create = useCreatePartyMember(campaignId);
   const update = useUpdatePartyMember(campaignId);
   const remove = useDeletePartyMember(campaignId);
@@ -49,13 +54,14 @@ function PartyTrackerWidget({ campaignId }: WidgetContext) {
           onKeyDown={(e) => e.key === "Enter" && addMember()}
           autoComplete="off"
         />
-        <button
+        <PendingButton
           className="btn-primary"
-          disabled={create.isPending || !adding.trim()}
+          pending={create.isPending}
+          disabled={!adding.trim()}
           onClick={addMember}
         >
           Add
-        </button>
+        </PendingButton>
         <button
           className="btn-ghost whitespace-nowrap"
           disabled={create.isPending}
@@ -69,18 +75,30 @@ function PartyTrackerWidget({ campaignId }: WidgetContext) {
       </div>
 
       <ul className="flex-1 space-y-2 overflow-auto">
+        {list.isLoading && (
+          <li aria-hidden="true" className="space-y-2">
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
+          </li>
+        )}
         {list.data?.map((m) => (
           <PartyMemberRow
             key={m.id}
             member={m}
             campaignId={campaignId}
+            accounts={members.data ?? []}
             onChange={(input) => update.mutate({ id: m.id, input })}
             onDelete={() => remove.mutate(m.id)}
           />
         ))}
         {list.data?.length === 0 && (
-          <li className="py-6 text-center text-sm text-ink-400">
-            No party members yet — add one above.
+          <li>
+            <EmptyState
+              compact
+              icon="🛡️"
+              title="No party members yet"
+              description="Add a character above, or load the sample party."
+            />
           </li>
         )}
       </ul>
@@ -91,13 +109,15 @@ function PartyTrackerWidget({ campaignId }: WidgetContext) {
 interface PartyMemberRowProps {
   member: PartyMember;
   campaignId: string;
+  /** Campaign accounts, for linking this character to a player. */
+  accounts: CampaignMember[];
   onChange: (
     input: Parameters<ReturnType<typeof useUpdatePartyMember>["mutate"]>[0]["input"],
   ) => void;
   onDelete: () => void;
 }
 
-function PartyMemberRow({ member, campaignId, onChange, onDelete }: PartyMemberRowProps) {
+function PartyMemberRow({ member, campaignId, accounts, onChange, onDelete }: PartyMemberRowProps) {
   const [localName, setLocalName] = useState(member.name);
   const [localPlayer, setLocalPlayer] = useState(member.playerName ?? "");
   const [localHp, setLocalHp] = useState(member.hp ?? 0);
@@ -162,6 +182,31 @@ function PartyMemberRow({ member, campaignId, onChange, onDelete }: PartyMemberR
           Sheet
         </button>
         <InlineConfirm onConfirm={onDelete} title="Remove from party" />
+      </div>
+
+      {/* Link to a player account — enables the player's self-service "My Character" panel. */}
+      <div className="mt-1.5 flex items-center gap-1.5">
+        <span
+          className={clsx("w-5 text-center text-xs", member.userId ? "text-accent-400" : "text-ink-500")}
+          title={member.userId ? "Linked to a player account" : "Not linked to a player account"}
+          aria-hidden="true"
+        >
+          🔗
+        </span>
+        <select
+          className="input flex-1 text-xs"
+          value={member.userId ?? ""}
+          aria-label={`Linked player account for ${member.name}`}
+          title="Link this character to a player account so they can manage HP, conditions and notes from the player view"
+          onChange={(e) => onChange({ userId: e.target.value || null })}
+        >
+          <option value="">Not linked — player can't self-manage</option>
+          {accounts.map((a) => (
+            <option key={a.userId} value={a.userId}>
+              {(a.user.displayName?.trim() || a.user.username) + (a.role === "dm" ? " (DM)" : "")}
+            </option>
+          ))}
+        </select>
       </div>
 
       {sheet && (

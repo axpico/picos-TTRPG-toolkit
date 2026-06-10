@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import type { PublicLocation } from "@toolkit/shared";
 import { TokenView, GridOverlay } from "../modules/map/TokenView.js";
@@ -12,19 +12,58 @@ import { TokenView, GridOverlay } from "../modules/map/TokenView.js";
 export function MapStage({ map }: { map: PublicLocation }) {
   const hasReveals = map.reveals.some((r) => r.mode === "reveal");
   const [aspect, setAspect] = useState(1);
+  const sectionRef = useRef<HTMLElement>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+
+  useEffect(() => {
+    const onChange = () => setFullscreen(document.fullscreenElement === sectionRef.current);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenEnabled) return;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+    } else {
+      void sectionRef.current?.requestFullscreen().catch(() => {});
+    }
+  };
 
   return (
-    <section className="card overflow-hidden">
-      <header className="flex items-center justify-between border-b border-ink-700 px-4 py-2">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-ink-300">{map.name}</h2>
-        <span className="text-xs text-ink-500">scroll / pinch to zoom · double-tap to reset</span>
+    <section ref={sectionRef} className="card flex flex-col overflow-hidden">
+      <header className="flex items-center justify-between gap-2 border-b border-ink-700 px-4 py-2">
+        <h2 className="min-w-0 truncate text-sm font-medium uppercase tracking-wide text-ink-300">
+          {map.name}
+        </h2>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="hidden text-xs text-ink-500 sm:inline">
+            scroll / pinch to zoom · double-tap to reset
+          </span>
+          {typeof document !== "undefined" && document.fullscreenEnabled && (
+            <button
+              className="btn-ghost h-7 px-2 text-xs"
+              onClick={toggleFullscreen}
+              title={fullscreen ? "Exit fullscreen" : "View map fullscreen"}
+              aria-label={fullscreen ? "Exit fullscreen map" : "View map fullscreen"}
+            >
+              {fullscreen ? "🗗 Exit" : "⛶ Full"}
+            </button>
+          )}
+        </div>
       </header>
       {map.playerNotes && (
         <p className="border-b border-ink-700 px-4 py-2 text-sm text-ink-200">{map.playerNotes}</p>
       )}
 
       {map.imageUrl ? (
-        <div className="h-[60vh] bg-ink-950">
+        <div
+          className={
+            fullscreen
+              ? "min-h-0 flex-1 bg-ink-950"
+              : "h-[50vh] bg-ink-950 landscape:h-[70vh] lg:h-[60vh]"
+          }
+        >
           <TransformWrapper
             minScale={0.5}
             maxScale={6}

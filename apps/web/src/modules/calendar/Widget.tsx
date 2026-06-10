@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { dayPhase, weekdayName, type CalendarDefinition } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import type { AdvanceCalendarInput } from "@toolkit/shared";
+import { Skeleton } from "../../components/Skeleton.js";
+import { PendingButton } from "../shared.js";
 import { useAdvanceCalendar, useCalendar, useSetCalendar } from "./api.js";
 import { useRollWeather } from "../weather/api.js";
 
@@ -29,7 +31,13 @@ function CalendarWidget({ campaignId, state, setState }: WidgetContext) {
   }, [data.data]);
 
   if (!data.data) {
-    return <div className="p-3 text-sm text-ink-400">Loading…</div>;
+    return (
+      <div className="space-y-2 p-3" aria-hidden="true">
+        <Skeleton className="h-14" />
+        <Skeleton className="h-24" />
+        <Skeleton className="h-20" />
+      </div>
+    );
   }
 
   const c = data.data;
@@ -221,9 +229,9 @@ function CalendarWidget({ campaignId, state, setState }: WidgetContext) {
               onChange={(e) => setDefText(e.target.value)}
             />
             {defErr && <div className="text-xs text-red-400">{defErr}</div>}
-            <button className="btn-primary" onClick={commitDef}>
+            <PendingButton className="btn-primary" onClick={commitDef} pending={set.isPending}>
               Save definition
-            </button>
+            </PendingButton>
           </div>
         )}
       </div>

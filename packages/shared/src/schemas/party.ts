@@ -49,5 +49,6 @@ export const updateMyCharacterInput = z.object({
   status: partyMemberStatus.optional(),
   conditions: z.array(z.string().min(1).max(60)).max(40).optional(),
   notes: z.string().max(4000).optional(),
+  stats: statBlock.optional(),
 });
 export type UpdateMyCharacterInput = z.infer<typeof updateMyCharacterInput>;

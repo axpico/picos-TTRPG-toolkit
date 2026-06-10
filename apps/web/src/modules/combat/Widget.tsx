@@ -9,7 +9,9 @@ import type {
 } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { useWidgetState } from "../../canvas/useWidgetState.js";
-import { HpBar, InlineConfirm, StatusBadge } from "../shared.js";
+import { HpBar, InlineConfirm, PendingButton, StatusBadge } from "../shared.js";
+import { Skeleton } from "../../components/Skeleton.js";
+import { EmptyState } from "../../components/EmptyState.js";
 import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
 import { useParty, useUpdatePartyMember } from "../party/api.js";
 import { useAdvanceCalendar } from "../calendar/api.js";
@@ -80,16 +82,24 @@ function CombatTrackerWidget({ campaignId, state, setState }: WidgetContext) {
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && doCreate()}
         />
-        <button
+        <PendingButton
           className="btn-primary px-2"
-          disabled={create.isPending || !newName.trim()}
+          pending={create.isPending}
+          disabled={!newName.trim()}
           onClick={doCreate}
+          aria-label="Create encounter"
         >
           +
-        </button>
+        </PendingButton>
       </div>
 
-      {selected ? (
+      {list.isLoading ? (
+        <div className="space-y-2 p-3" aria-hidden="true">
+          <Skeleton className="h-8" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+        </div>
+      ) : selected ? (
         <EncounterPane
           encounter={selected}
           campaignId={campaignId}
@@ -98,8 +108,13 @@ function CombatTrackerWidget({ campaignId, state, setState }: WidgetContext) {
           onDelete={() => remove.mutate(selected.id)}
         />
       ) : (
-        <div className="flex flex-1 items-center justify-center text-sm text-ink-400">
-          Create or select an encounter to start tracking initiative.
+        <div className="flex flex-1 items-center justify-center p-3">
+          <EmptyState
+            compact
+            icon="⚔️"
+            title="No encounter selected"
+            description="Create or select an encounter to start tracking initiative."
+          />
         </div>
       )}
     </div>
@@ -436,8 +451,13 @@ function EncounterPane({
           />
         ))}
         {!hasCombatants && (
-          <li className="py-4 text-center text-sm text-ink-400">
-            No combatants — add one below.
+          <li>
+            <EmptyState
+              compact
+              icon="🗡️"
+              title="No combatants"
+              description="Add one below, or pull from the party, NPCs or bestiary."
+            />
           </li>
         )}
       </ul>
@@ -503,13 +523,14 @@ function EncounterPane({
           />
           PC
         </label>
-        <button
+        <PendingButton
           className="btn-primary px-2"
           onClick={submitCombatant}
+          pending={addCombatant.isPending}
           disabled={!draft.name.trim() || draft.initiative === ""}
         >
           Add
-        </button>
+        </PendingButton>
       </div>
     </div>
   );

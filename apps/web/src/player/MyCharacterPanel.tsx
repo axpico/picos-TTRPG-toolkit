@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import type { PartyMemberStatus } from "@toolkit/shared";
-import { HpBar } from "../modules/shared.js";
+import { HpBar, PendingButton } from "../modules/shared.js";
+import { EmptyState } from "../components/EmptyState.js";
+import { Skeleton } from "../components/Skeleton.js";
 import { CreatureSheetModal } from "../components/statblock/CreatureSheetModal.js";
 import { useMyCharacter, useUpdateMyCharacter } from "./usePlayer.js";
 import { addCondition, applyHpDelta, removeCondition } from "./format.js";
@@ -23,15 +25,27 @@ export function MyCharacterPanel({ campaignId }: { campaignId: string }) {
   }, [c]);
 
   if (character.isLoading) {
-    return <section className="card p-4 text-sm text-ink-400">Loading your character…</section>;
+    return (
+      <section className="card space-y-3 p-4" aria-label="Loading your character">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-12 w-12 rounded-lg" />
+          <Skeleton className="h-6 flex-1" />
+        </div>
+        <Skeleton className="h-2" />
+        <Skeleton className="h-8" />
+      </section>
+    );
   }
   if (!c) {
     return (
       <section className="card p-4">
-        <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-ink-300">My Character</h2>
-        <p className="text-sm text-ink-400">
-          No character assigned yet. Ask your DM to link a party member to you.
-        </p>
+        <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-ink-300">My Character</h2>
+        <EmptyState
+          compact
+          icon="🧝"
+          title="No character linked"
+          description="Ask your GM to link your account to a character — Party widget, 🔗 picker on your character's card. Your sheet then appears here automatically."
+        />
       </section>
     );
   }
@@ -70,7 +84,6 @@ export function MyCharacterPanel({ campaignId }: { campaignId: string }) {
       {sheet && (
         <CreatureSheetModal
           open
-          readOnly
           onClose={() => setSheet(false)}
           title={c.name}
           subtitle={c.playerName ? `Played by ${c.playerName}` : null}
@@ -79,6 +92,7 @@ export function MyCharacterPanel({ campaignId }: { campaignId: string }) {
           kind="player"
           stats={c.stats}
           hideHp
+          onChange={(next) => update.mutate({ stats: next })}
         />
       )}
 
@@ -94,8 +108,12 @@ export function MyCharacterPanel({ campaignId }: { campaignId: string }) {
           value={amount}
           onChange={(e) => setAmount(Math.max(1, Number(e.target.value) || 1))}
         />
-        <button className="btn-danger h-8 flex-1" onClick={() => setHp(-amount)}>Damage</button>
-        <button className="btn-primary h-8 flex-1" onClick={() => setHp(amount)}>Heal</button>
+        <PendingButton className="btn-danger h-8 flex-1" pending={update.isPending} onClick={() => setHp(-amount)}>
+          Damage
+        </PendingButton>
+        <PendingButton className="btn-primary h-8 flex-1" pending={update.isPending} onClick={() => setHp(amount)}>
+          Heal
+        </PendingButton>
         <button className="btn-ghost h-8 px-2" onClick={() => setHp(1)} title="+1">＋</button>
       </div>
 

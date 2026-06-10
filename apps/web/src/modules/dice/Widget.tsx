@@ -2,6 +2,9 @@ import { useRef, useState } from "react";
 import clsx from "clsx";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { useMe, roleIn } from "../../auth/useAuth.js";
+import { Skeleton } from "../../components/Skeleton.js";
+import { EmptyState } from "../../components/EmptyState.js";
+import { PendingButton } from "../shared.js";
 import { useDiceHistory, useRollDice } from "./api.js";
 import { fmtTime, parseBreakdown } from "./format.js";
 
@@ -95,13 +98,14 @@ function DiceWidget({ campaignId }: WidgetContext) {
         >
           Dis
         </button>
-        <button
+        <PendingButton
           className="btn-primary px-3 font-semibold"
           onClick={() => doRoll()}
-          disabled={roll.isPending || !notation.trim()}
+          pending={roll.isPending}
+          disabled={!notation.trim()}
         >
           Roll
-        </button>
+        </PendingButton>
       </div>
 
       {/* DM-only hidden toggle */}
@@ -133,7 +137,13 @@ function DiceWidget({ campaignId }: WidgetContext) {
 
       {/* History list */}
       <div className="flex-1 overflow-auto px-2 py-2">
-        {history.data && history.data.length > 0 ? (
+        {history.isLoading ? (
+          <div className="space-y-2" aria-hidden="true">
+            <Skeleton className="h-10" />
+            <Skeleton className="h-10" />
+            <Skeleton className="h-10" />
+          </div>
+        ) : history.data && history.data.length > 0 ? (
           <ul className="space-y-1 text-sm">
             {history.data.map((r, idx) => (
               <li
@@ -176,9 +186,12 @@ function DiceWidget({ campaignId }: WidgetContext) {
             ))}
           </ul>
         ) : (
-          <div className="flex h-full items-center justify-center text-sm text-ink-400">
-            No rolls yet — pick a die or type a notation.
-          </div>
+          <EmptyState
+            compact
+            icon="🎲"
+            title="No rolls yet"
+            description="Pick a die or type a notation to get rolling."
+          />
         )}
       </div>
     </div>

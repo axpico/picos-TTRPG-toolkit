@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
 
@@ -16,6 +16,16 @@ export function useToast(): ToastFn {
   return useContext(ToastContext);
 }
 
+// Module-level bridge so non-React code (e.g. the QueryClient's MutationCache
+// onError) can raise toasts. ToastProvider registers itself on mount.
+let externalToast: ToastFn = () => {};
+
+export function setGlobalToast(fn: ToastFn) {
+  externalToast = fn;
+}
+
+export const globalToast: ToastFn = (message, kind) => externalToast(message, kind);
+
 const DURATION_MS = 3000;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -27,6 +37,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setItems((cur) => [...cur, { id, message, kind }]);
     setTimeout(() => setItems((cur) => cur.filter((t) => t.id !== id)), DURATION_MS);
   }, []);
+
+  useEffect(() => {
+    setGlobalToast(toast);
+    return () => setGlobalToast(() => {});
+  }, [toast]);
 
   return (
     <ToastContext.Provider value={toast}>

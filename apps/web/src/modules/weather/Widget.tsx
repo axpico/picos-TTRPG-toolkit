@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { WEATHER_PRESETS, weatherIcon, type WeatherTableEntry } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
+import { Skeleton } from "../../components/Skeleton.js";
+import { PendingButton } from "../shared.js";
 import { useRollWeather, useSetWeather, useWeather } from "./api.js";
 
 const TEMPERATURES = ["Freezing", "Cold", "Cool", "Mild", "Warm", "Hot"] as const;
@@ -28,7 +30,12 @@ function WeatherWidget({ campaignId }: WidgetContext) {
   }, [data.data]);
 
   if (!data.data) {
-    return <div className="p-3 text-sm text-ink-400">Loading…</div>;
+    return (
+      <div className="space-y-2 p-3" aria-hidden="true">
+        <Skeleton className="h-20" />
+        <Skeleton className="h-28" />
+      </div>
+    );
   }
 
   const current = data.data.current;
@@ -162,9 +169,9 @@ function WeatherWidget({ campaignId }: WidgetContext) {
 
       {/* Actions */}
       <div className="flex items-center gap-1 border-b border-ink-700 p-3">
-        <button className="btn-primary" onClick={() => roll.mutate()} disabled={roll.isPending}>
+        <PendingButton className="btn-primary" onClick={() => roll.mutate()} pending={roll.isPending}>
           🎲 Roll new weather
-        </button>
+        </PendingButton>
         <button className="btn-ghost ml-auto" onClick={() => setShowTable((v) => !v)}>
           {showTable ? "Hide roll table" : "Edit roll table"}
         </button>

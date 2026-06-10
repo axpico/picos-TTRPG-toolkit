@@ -223,6 +223,7 @@ export const playerRoutes: FastifyPluginAsync = async (app) => {
         ...(body.status !== undefined ? { status: body.status } : {}),
         ...(body.conditions !== undefined ? { conditionsJson: JSON.stringify(body.conditions) } : {}),
         ...(body.notes !== undefined ? { notes: body.notes ?? null } : {}),
+        ...(body.stats !== undefined ? { statsJson: JSON.stringify(body.stats) } : {}),
       },
     });
     const dto = toPartyDto(updated);

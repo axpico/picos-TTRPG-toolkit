@@ -3,6 +3,7 @@ import clsx from "clsx";
 import { useDiceHistory, useRollDice } from "../modules/dice/api.js";
 import { parseBreakdown } from "../modules/dice/format.js";
 import { useMe } from "../auth/useAuth.js";
+import { PendingButton } from "../modules/shared.js";
 
 const QUICK = ["d4", "d6", "d8", "d10", "d12", "d20", "d100"] as const;
 
@@ -43,9 +44,9 @@ export function DicePanel({ campaignId }: { campaignId: string }) {
           placeholder="e.g. 2d6+3"
           spellCheck={false}
         />
-        <button className="btn-primary px-4 font-semibold" onClick={() => doRoll()} disabled={roll.isPending || !notation.trim()}>
+        <PendingButton className="btn-primary px-4 font-semibold" onClick={() => doRoll()} pending={roll.isPending} disabled={!notation.trim()}>
           Roll
-        </button>
+        </PendingButton>
       </div>
       <div className="mt-1 flex gap-1">
         <button

@@ -3,7 +3,8 @@ import clsx from "clsx";
 import type { Timer, UpdateTimerInput } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
 import { EmptyState } from "../../components/EmptyState.js";
-import { InlineConfirm } from "../shared.js";
+import { Skeleton } from "../../components/Skeleton.js";
+import { InlineConfirm, PendingButton } from "../shared.js";
 import { useCreateTimer, useDeleteTimer, useTimers, useUpdateTimer } from "./api.js";
 import { formatDuration, isRunning, playAlarm, remainingSeconds } from "./util.js";
 
@@ -84,13 +85,18 @@ function TimersWidget({ campaignId }: WidgetContext) {
           onChange={(e) => setNewMinutes(Math.max(1, Number(e.target.value) || 1))}
           title="Minutes"
         />
-        <button className="btn-primary px-2" disabled={!newName.trim() || create.isPending} onClick={doCreate} aria-label="Add timer">
+        <PendingButton className="btn-primary px-2" pending={create.isPending} disabled={!newName.trim()} onClick={doCreate} aria-label="Add timer">
           +
-        </button>
+        </PendingButton>
       </div>
 
       <div className="flex-1 overflow-auto p-2">
-        {timers.length > 0 ? (
+        {list.isLoading ? (
+          <div className="grid grid-cols-2 gap-2" aria-hidden="true">
+            <Skeleton className="h-36" />
+            <Skeleton className="h-36" />
+          </div>
+        ) : timers.length > 0 ? (
           <div className="grid grid-cols-2 gap-2">
             {timers.map((timer) => (
               <TimerCard
@@ -105,6 +111,7 @@ function TimersWidget({ campaignId }: WidgetContext) {
         ) : (
           <div className="flex h-full items-center justify-center p-4">
             <EmptyState
+              compact
               icon="⏱️"
               title="No timers yet"
               description="Add a countdown for combat turns, rests, or a dramatic 'decide now' clock players can see."

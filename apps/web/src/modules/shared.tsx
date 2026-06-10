@@ -1,5 +1,36 @@
-import { useState, type ReactNode } from "react";
+import { useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import clsx from "clsx";
+
+/**
+ * Button that disables itself and shows a spinner while a mutation is in
+ * flight. Use next to `useMutation` calls so double-submits are impossible and
+ * the user always sees that something is happening.
+ */
+export function PendingButton({
+  pending = false,
+  disabled,
+  children,
+  className,
+  type = "button",
+  ...rest
+}: ButtonHTMLAttributes<HTMLButtonElement> & { pending?: boolean }) {
+  return (
+    <button
+      {...rest}
+      type={type}
+      disabled={pending || disabled}
+      aria-busy={pending || undefined}
+      className={clsx(className ?? "btn-primary", pending && "cursor-wait opacity-70")}
+    >
+      {pending && (
+        <span aria-hidden="true" className="mr-1.5 inline-block animate-spin">
+          ◌
+        </span>
+      )}
+      {children}
+    </button>
+  );
+}
 
 /** Semantic status badge. Wraps the `.badge-*` utilities so every widget shows
  *  statuses (alive/down/running/secret…) with one consistent style. */

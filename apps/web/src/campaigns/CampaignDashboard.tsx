@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useCampaign, useRotateJoinCode } from "./useCampaigns.js";
 import { useLogout } from "../auth/useAuth.js";
@@ -25,14 +25,26 @@ export function CampaignDashboard() {
   const logout = useLogout();
   const layoutSync = useLayoutSync(campaignId);
   const upsertItem = useCanvasStore((s) => s.upsertItem);
+  const locked = useCanvasStore((s) => s.locked);
+  const setLocked = useCanvasStore((s) => s.setLocked);
   const navigate = useNavigate();
   const rotate = useRotateJoinCode();
   const confirm = useConfirm();
   const toast = useToast();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [conn, setConn] = useState<ConnectionStatus>("live");
+  const [copied, setCopied] = useState(false);
+  const prevConn = useRef<ConnectionStatus>("live");
 
   useBroadcast({ url: `/api/stream/${campaignId}`, campaignId, onStatus: setConn });
+
+  // Announce recovery: only on a reconnecting → live transition, never on mount.
+  useEffect(() => {
+    if (prevConn.current === "reconnecting" && conn === "live") {
+      toast("Back online — live updates restored.", "success");
+    }
+    prevConn.current = conn;
+  }, [conn, toast]);
 
   // Global shortcut: "/" or Cmd/Ctrl-K opens the widget palette.
   useEffect(() => {
@@ -91,7 +103,8 @@ export function CampaignDashboard() {
   const copyJoinCode = async () => {
     if (!c.joinCode) return;
     if (await copyText(c.joinCode)) {
-      toast("Join code copied — share it with your players.", "success");
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
     } else {
       toast(`Join code: ${c.joinCode}`);
     }
@@ -118,6 +131,14 @@ export function CampaignDashboard() {
           <button className="btn-primary" onClick={() => setPaletteOpen(true)} title="Add widget (press / or ⌘K)">
             + Add widget
           </button>
+          <button
+            className="btn-ghost"
+            onClick={() => setLocked(!locked)}
+            aria-pressed={locked}
+            title={locked ? "Unlock widgets (allow moving and resizing)" : "Lock widgets (prevent accidental drags)"}
+          >
+            {locked ? "🔒 Locked" : "🔓 Lock"}
+          </button>
           <div className="mx-1 h-5 w-px bg-ink-700" />
           <ShareControls campaignId={c.id} />
           {conn === "reconnecting" && (
@@ -135,7 +156,7 @@ export function CampaignDashboard() {
               onClick={copyJoinCode}
               title="Copy the join code for players"
             >
-              Code: {c.joinCode.slice(0, 8)}…
+              {copied ? <span className="text-accent-400">Copied ✓</span> : <>Code: {c.joinCode.slice(0, 8)}…</>}
             </button>
           )}
           <button className="btn-ghost" onClick={onRotate} title="Generate a new join code">
