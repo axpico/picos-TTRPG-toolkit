@@ -17,7 +17,9 @@ export function useSetWeather(campaignId: string) {
   return useMutation({
     mutationFn: (input: SetWeatherInput) =>
       api.patch<Weather>(`/api/campaigns/${campaignId}/weather`, input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: key(campaignId) }),
+    // The PATCH returns the full updated Weather, so write it straight into the
+    // cache instead of invalidating — avoids a second round-trip per save.
+    onSuccess: (weather) => qc.setQueryData(key(campaignId), weather),
   });
 }
 
@@ -26,6 +28,6 @@ export function useRollWeather(campaignId: string) {
   return useMutation({
     mutationFn: () =>
       api.post<Weather>(`/api/campaigns/${campaignId}/weather/roll`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: key(campaignId) }),
+    onSuccess: (weather) => qc.setQueryData(key(campaignId), weather),
   });
 }
