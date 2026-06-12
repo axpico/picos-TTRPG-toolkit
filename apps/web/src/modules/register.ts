@@ -3,6 +3,7 @@ import "./party/Widget.js";
 import "./combat/Widget.js";
 import "./npc/Widget.js";
 import "./bestiary/Widget.js";
+import "./spells/Widget.js";
 import "./sessions/Widget.js";
 import "./shop/Widget.js";
 import "./weather/Widget.js";

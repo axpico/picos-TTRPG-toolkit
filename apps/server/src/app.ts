@@ -11,6 +11,7 @@ import { partyRoutes } from "./routes/party.js";
 import { combatRoutes } from "./routes/combat.js";
 import { npcRoutes } from "./routes/npc.js";
 import { monsterRoutes } from "./routes/monster.js";
+import { spellRoutes } from "./routes/spell.js";
 import { sessionRoutes } from "./routes/session.js";
 import { shopRoutes } from "./routes/shop.js";
 import { diceRoutes } from "./routes/dice.js";
@@ -80,6 +81,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       dmAny.addHook("preHandler", dmAny.requireAnyDm);
       await dmAny.register(npcRoutes, { prefix: "/api/npcs" });
       await dmAny.register(monsterRoutes, { prefix: "/api/monsters" });
+      await dmAny.register(spellRoutes, { prefix: "/api/spells" });
       await dmAny.register(fileUploadRoutes, { prefix: "/api/uploads" });
       await dmAny.register(adminRoutes, { prefix: "/api/admin" });
     });

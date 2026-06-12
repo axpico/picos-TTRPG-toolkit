@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import clsx from "clsx";
 import { abilityMod, ABILITY_KEYS, formatMod, type StatBlock } from "@toolkit/shared";
+import { Markdown } from "../components/Markdown.js";
 
 /**
  * Client side of the generic share engine. Each shareable widget registers a
@@ -137,6 +138,69 @@ function MonsterCard({ data }: ShareRendererProps) {
   );
 }
 
+// --- Grimoire / spell reveal --------------------------------------------------
+interface SpellShare {
+  name: string;
+  level: number;
+  school: string | null;
+  castingTime: string | null;
+  range: string | null;
+  components: string | null;
+  duration: string | null;
+  description: string;
+  higherLevels: string | null;
+  classes: string[];
+  ritual: boolean;
+  concentration: boolean;
+  source: string | null;
+}
+function SpellCard({ data }: ShareRendererProps) {
+  const s = data as SpellShare;
+  const subtitle =
+    s.level === 0
+      ? `${s.school ?? "magic"} cantrip`
+      : `Level ${s.level}${s.school ? ` ${s.school}` : ""}`;
+  const props: [string, string | null][] = [
+    ["Casting time", s.castingTime],
+    ["Range", s.range],
+    ["Components", s.components],
+    ["Duration", s.duration],
+  ];
+  return (
+    <Section title="Spell">
+      <div className="display text-lg font-semibold text-ink-50">{s.name}</div>
+      <div className="mb-2 flex flex-wrap items-center gap-1.5 text-sm capitalize text-ink-400">
+        <span>{subtitle}</span>
+        {s.ritual && <span className="chip">Ritual</span>}
+        {s.concentration && <span className="chip">Concentration</span>}
+      </div>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+        {props
+          .filter(([, v]) => v)
+          .map(([label, v]) => (
+            <div key={label}>
+              <span className="text-ink-500">{label}: </span>
+              <span className="text-ink-200">{v}</span>
+            </div>
+          ))}
+      </div>
+      {s.description && <Markdown className="mt-3 text-sm text-ink-300">{s.description}</Markdown>}
+      {s.higherLevels && (
+        <p className="mt-2 text-sm text-ink-300">
+          <span className="font-semibold text-ink-100">At higher levels.</span> {s.higherLevels}
+        </p>
+      )}
+      {s.classes.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1">
+          {s.classes.map((c) => (
+            <span key={c} className="chip">{c}</span>
+          ))}
+        </div>
+      )}
+    </Section>
+  );
+}
+
 // --- Shop -------------------------------------------------------------------
 interface ShopShare {
   name: string;
@@ -265,6 +329,7 @@ function FallbackCard({ widgetKey }: ShareRendererProps) {
 
 registerShareRenderer("npc", NpcCard);
 registerShareRenderer("bestiary", MonsterCard);
+registerShareRenderer("spells", SpellCard);
 registerShareRenderer("shop", ShopCard);
 registerShareRenderer("sessions", SessionCard);
 registerShareRenderer("log", LogCard);

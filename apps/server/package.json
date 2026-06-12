@@ -13,6 +13,7 @@
     "migrate:deploy": "dotenv -e ../../.env -- prisma migrate deploy --schema=prisma/schema.prisma",
     "preseed": "npm run db:ensure",
     "seed": "tsx --env-file=../../.env prisma/seed.ts",
+    "import:spells": "tsx --env-file=../../.env scripts/import-spells.ts",
     "test": "node --import tsx --test --experimental-test-module-mocks \"test/**/*.test.ts\"",
     "prisma:generate": "dotenv -e ../../.env -- prisma generate --schema=prisma/schema.prisma",
     "check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit && dotenv -e ../../.env -- prisma validate --schema=prisma/schema.prisma"
@@ -26,6 +27,7 @@
     "@toolkit/shared": "*",
     "archiver": "^7.0.1",
     "bcryptjs": "^2.4.3",
+    "cheerio": "^1.2.0",
     "fastify": "^5.1.0",
     "pino-pretty": "^11.3.0",
     "zod": "^3.23.8"

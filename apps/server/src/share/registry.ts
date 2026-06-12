@@ -1,6 +1,7 @@
 import { prisma } from "../db.js";
 import { toNpcDto } from "../lib/repos/npc.js";
 import { toMonsterDto } from "../lib/repos/monster.js";
+import { toSpellDto } from "../lib/repos/spell.js";
 import { toShopDto } from "../lib/repos/shop.js";
 import { toSessionDto } from "../lib/repos/session.js";
 import { toLogDto } from "../lib/repos/log.js";
@@ -68,6 +69,33 @@ registerProjector("bestiary", async (campaignId, payload) => {
     challenge: dto.challenge,
     tags: dto.tags,
     stats: dto.stats,
+  };
+});
+
+// --- Grimoire — reveal a single spell's details ------------------------------
+registerProjector("spells", async (campaignId, payload) => {
+  const spellId = str(payload.spellId);
+  if (!spellId) return null;
+  const row = await prisma.spell.findUnique({ where: { id: spellId } });
+  if (!row) return null;
+  if (row.campaignId && row.campaignId !== campaignId) return null;
+  const dto = toSpellDto(row);
+  // Player-safe: spells are public rules content; only GM tags stay private.
+  return {
+    id: dto.id,
+    name: dto.name,
+    level: dto.level,
+    school: dto.school,
+    castingTime: dto.castingTime,
+    range: dto.range,
+    components: dto.components,
+    duration: dto.duration,
+    description: dto.description,
+    higherLevels: dto.higherLevels,
+    classes: dto.classes,
+    ritual: dto.ritual,
+    concentration: dto.concentration,
+    source: dto.source,
   };
 });
 

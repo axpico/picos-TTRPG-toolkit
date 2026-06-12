@@ -8,6 +8,7 @@ export * from "./party.js";
 export * from "./combat.js";
 export * from "./npc.js";
 export * from "./monster.js";
+export * from "./spell.js";
 export * from "./session.js";
 export * from "./shop.js";
 export * from "./weather.js";
