@@ -59,4 +59,51 @@ describe("downloadModelBlobUrl", () => {
     expect(url).toBe("blob:mock");
     expect(progress).toContain("Downloading model…");
   });
+
+  it("passes an AbortSignal through to fetch", async () => {
+    const fetchSpy = vi.fn(async () => streamResponse([4], 4));
+    vi.stubGlobal("URL", { createObjectURL });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const controller = new AbortController();
+    await downloadModelBlobUrl("/models/m.tar.gz", vi.fn(), controller.signal);
+
+    expect(fetchSpy).toHaveBeenCalledWith("/models/m.tar.gz", { signal: expect.any(AbortSignal) });
+  });
+
+  it("rejects with a clear timeout error when a read stalls past the watchdog", async () => {
+    vi.useFakeTimers();
+    let signalForReader: AbortSignal | undefined;
+    // A body whose read never resolves on its own — simulates a hung connection.
+    // It rejects only once the stall watchdog aborts the fetch signal.
+    const hung = {
+      ok: true,
+      status: 200,
+      headers: { get: (k: string) => (k === "content-length" ? "1048576" : null) },
+      body: {
+        getReader: () => ({
+          read: (): Promise<never> =>
+            new Promise((_resolve, reject) => {
+              signalForReader?.addEventListener("abort", () => reject(new Error("aborted")), {
+                once: true,
+              });
+            }),
+        }),
+      },
+    } as unknown as Response;
+    vi.stubGlobal("URL", { createObjectURL });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        signalForReader = init?.signal ?? undefined;
+        return hung;
+      }),
+    );
+
+    const promise = downloadModelBlobUrl("/models/m.tar.gz", vi.fn());
+    const assertion = expect(promise).rejects.toThrow(/timed out/i);
+    await vi.advanceTimersByTimeAsync(30_000);
+    await assertion;
+    vi.useRealTimers();
+  });
 });

@@ -26,6 +26,18 @@ const WORKLET_URL = "/vosk/recognizer-processor.js";
 const MODEL_MISSING_REASON =
   "Offline voice search needs a model — set VITE_VOSK_MODEL_URL (see README)";
 const LOAD_FAILED_REASON = "Could not load the offline voice model";
+const DOWNLOAD_TIMEOUT_REASON = "Model download timed out — check the URL/network";
+/** Abort the download if no bytes arrive for this long (a stalled connection). */
+const MODEL_DOWNLOAD_STALL_MS = 30_000;
+
+/**
+ * Dev-only trace; stays silent in production builds. Gated on MODE (set by
+ * Vite's --mode) rather than DEV, because this project's root .env pins
+ * NODE_ENV=development, which would otherwise keep DEV truthy in builds too.
+ */
+function debug(...args: unknown[]): void {
+  if (import.meta.env.MODE !== "production") console.info("[voice]", ...args);
+}
 
 /** Read the configured model URL; empty/unset means the engine is disabled. */
 export function getVoskModelUrl(): string | null {
@@ -38,12 +50,30 @@ export function getVoskModelUrl(): string | null {
  * it) so we can report byte progress and fail fast + clearly on a 404 instead of
  * the silent multi-MB stall users were hitting. Returns an object URL for the
  * downloaded blob, which `createModel` then loads from memory.
+ *
+ * A per-read stall watchdog aborts a hung connection so the UI recovers instead
+ * of freezing on a stuck percentage; pass `signal` to also allow the caller to
+ * cancel an in-flight download (e.g. when the user hits stop mid-load).
  */
 export async function downloadModelBlobUrl(
   url: string,
   onProgress: (detail: string) => void,
+  signal?: AbortSignal,
 ): Promise<string> {
-  const res = await fetch(url);
+  const stallController = new AbortController();
+  // Bridge an external abort signal into our own controller.
+  if (signal) {
+    if (signal.aborted) stallController.abort();
+    else signal.addEventListener("abort", () => stallController.abort(), { once: true });
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(url, { signal: stallController.signal });
+  } catch (err) {
+    if (stallController.signal.aborted) throw new Error(DOWNLOAD_TIMEOUT_REASON);
+    throw err;
+  }
   if (!res.ok) {
     throw new Error(`Model not found (HTTP ${res.status}) at ${url}`);
   }
@@ -56,13 +86,25 @@ export async function downloadModelBlobUrl(
   const chunks: BlobPart[] = [];
   let received = 0;
   const totalMb = (total / 1_048_576).toFixed(0);
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done || !value) break;
-    chunks.push(value);
-    received += value.length;
-    const pct = Math.round((received / total) * 100);
-    onProgress(`Downloading model… ${pct}% (${(received / 1_048_576).toFixed(0)}/${totalMb} MB)`);
+  try {
+    for (;;) {
+      const stall = setTimeout(() => stallController.abort(), MODEL_DOWNLOAD_STALL_MS);
+      let result: Awaited<ReturnType<typeof reader.read>>;
+      try {
+        result = await reader.read();
+      } finally {
+        clearTimeout(stall);
+      }
+      const { done, value } = result;
+      if (done || !value) break;
+      chunks.push(value);
+      received += value.length;
+      const pct = Math.round((received / total) * 100);
+      onProgress(`Downloading model… ${pct}% (${(received / 1_048_576).toFixed(0)}/${totalMb} MB)`);
+    }
+  } catch (err) {
+    if (stallController.signal.aborted) throw new Error(DOWNLOAD_TIMEOUT_REASON);
+    throw err;
   }
   return URL.createObjectURL(new Blob(chunks));
 }
@@ -85,6 +127,10 @@ export function useVoskSpeechRecognition(): UseSpeechRecognition {
   const graphRef = useRef<VoskGraph | null>(null);
   const modelPromiseRef = useRef<Promise<Model> | null>(null);
   const wantListeningRef = useRef(false);
+  // Resources that exist before the graph is assembled, so stop()/teardown can
+  // release them if the user cancels mid-load (slow download, model unpack).
+  const pendingStreamRef = useRef<MediaStream | null>(null);
+  const downloadAbortRef = useRef<AbortController | null>(null);
   const [listening, setListening] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState<string | undefined>(undefined);
@@ -95,6 +141,15 @@ export function useVoskSpeechRecognition(): UseSpeechRecognition {
   );
 
   const teardown = useCallback(() => {
+    // Cancel an in-flight model download and release a mic stream acquired
+    // before the graph was built (the stop-during-load path).
+    downloadAbortRef.current?.abort();
+    downloadAbortRef.current = null;
+    if (pendingStreamRef.current) {
+      pendingStreamRef.current.getTracks().forEach((t) => t.stop());
+      pendingStreamRef.current = null;
+    }
+
     const graph = graphRef.current;
     graphRef.current = null;
     if (!graph) return;
@@ -122,38 +177,53 @@ export function useVoskSpeechRecognition(): UseSpeechRecognition {
     wantListeningRef.current = true;
     setError(null);
     setLoading(true);
+    // Fresh session: don't carry over text from a previous listen.
+    setTranscript("");
+    setInterim("");
 
     void (async () => {
       try {
         // 1. Mic permission + stream (surfaces denied/missing-device clearly).
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        pendingStreamRef.current = stream;
 
         // 2. Load (and cache) the engine + model — the expensive, one-time step.
         if (!modelPromiseRef.current) {
+          const abort = new AbortController();
+          downloadAbortRef.current = abort;
           modelPromiseRef.current = (async () => {
-            console.info("[voice] downloading offline model:", modelUrl);
+            debug("downloading offline model:", modelUrl);
             setLoadingDetail("Downloading model…");
-            const blobUrl = await downloadModelBlobUrl(modelUrl, setLoadingDetail);
-            console.info("[voice] model downloaded; unpacking + loading WASM…");
+            const blobUrl = await downloadModelBlobUrl(modelUrl, setLoadingDetail, abort.signal);
+            debug("model downloaded; unpacking + loading WASM…");
             setLoadingDetail("Unpacking model + starting engine…");
             const { createModel } = await import("vosk-browser");
-            const m = await createModel(blobUrl);
-            URL.revokeObjectURL(blobUrl);
-            console.info("[voice] offline voice engine ready");
-            return m;
+            try {
+              const m = await createModel(blobUrl);
+              debug("offline voice engine ready");
+              return m;
+            } finally {
+              // Always release the blob, including when createModel throws.
+              URL.revokeObjectURL(blobUrl);
+            }
           })();
         }
         const model = await modelPromiseRef.current;
+        downloadAbortRef.current = null;
 
         // The user may have hit stop() while the model downloaded.
         if (!wantListeningRef.current) {
           stream.getTracks().forEach((t) => t.stop());
+          pendingStreamRef.current = null;
           return;
         }
 
         // 3. Audio graph: mic -> worklet -> (silent) destination; the worklet
         // posts PCM chunks back here to feed the recognizer.
         const audioContext = new AudioContext();
+        // Firefox often starts the context suspended; without resuming, the
+        // graph connects but no audio flows (mic looks live, nothing happens).
+        if (audioContext.state === "suspended") await audioContext.resume();
         await audioContext.audioWorklet.addModule(WORKLET_URL);
         const recognizer = new model.KaldiRecognizer(audioContext.sampleRate);
         recognizer.setWords(false);
@@ -176,15 +246,18 @@ export function useVoskSpeechRecognition(): UseSpeechRecognition {
         source.connect(node);
         node.connect(audioContext.destination);
 
+        // The stream now lives in the graph; teardown owns it from here.
+        pendingStreamRef.current = null;
         graphRef.current = { model, recognizer, audioContext, stream, node };
         setLoading(false);
         setLoadingDetail(undefined);
         setListening(true);
       } catch (err: unknown) {
-        console.error("[voice] offline engine failed to start:", err);
+        debug("offline engine failed to start:", err);
         // Drop the cached (rejected) model promise so a later retry re-downloads
         // instead of replaying the same failure.
         modelPromiseRef.current = null;
+        downloadAbortRef.current = null;
         const name = err instanceof Error ? err.name : "";
         const message = err instanceof Error ? err.message : "";
         setError(
@@ -192,7 +265,7 @@ export function useVoskSpeechRecognition(): UseSpeechRecognition {
             ? "Microphone access denied"
             : name === "NotFoundError"
               ? "No microphone found"
-              : message.startsWith("Model not found")
+              : message === DOWNLOAD_TIMEOUT_REASON || message.startsWith("Model not found")
                 ? message
                 : LOAD_FAILED_REASON,
         );

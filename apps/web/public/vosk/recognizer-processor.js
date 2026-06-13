@@ -8,6 +8,9 @@
 // echoing the mic back to the speakers.
 
 const CHUNK_SIZE = 4096;
+// Cap the backlog so a stalled/dead main thread can't grow the buffer without
+// bound (~8s of audio at 16kHz). Past this we drop the oldest samples.
+const MAX_BUFFER = CHUNK_SIZE * 32;
 
 class VoskRecognizerProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -24,9 +27,19 @@ class VoskRecognizerProcessor extends AudioWorkletProcessor {
       merged.set(channel, this._buffer.length);
       this._buffer = merged;
 
+      // Bound the backlog: if the main thread isn't draining, keep only the
+      // most recent MAX_BUFFER samples and discard the stale prefix.
+      if (this._buffer.length > MAX_BUFFER) {
+        this._buffer = this._buffer.slice(this._buffer.length - MAX_BUFFER);
+      }
+
       while (this._buffer.length >= CHUNK_SIZE) {
         const chunk = this._buffer.slice(0, CHUNK_SIZE);
-        this.port.postMessage(chunk, [chunk.buffer]);
+        try {
+          this.port.postMessage(chunk, [chunk.buffer]);
+        } catch {
+          // Port closed / main thread gone — nothing to do on the audio thread.
+        }
         this._buffer = this._buffer.slice(CHUNK_SIZE);
       }
     }
