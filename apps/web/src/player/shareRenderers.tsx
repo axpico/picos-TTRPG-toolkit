@@ -140,6 +140,7 @@ function MonsterCard({ data }: ShareRendererProps) {
 
 // --- Grimoire / spell reveal --------------------------------------------------
 interface SpellShare {
+  id: string;
   name: string;
   level: number;
   school: string | null;
@@ -154,8 +155,7 @@ interface SpellShare {
   concentration: boolean;
   source: string | null;
 }
-function SpellCard({ data }: ShareRendererProps) {
-  const s = data as SpellShare;
+function SpellBody({ s }: { s: SpellShare }) {
   const subtitle =
     s.level === 0
       ? `${s.school ?? "magic"} cantrip`
@@ -167,7 +167,7 @@ function SpellCard({ data }: ShareRendererProps) {
     ["Duration", s.duration],
   ];
   return (
-    <Section title="Spell">
+    <div>
       <div className="display text-lg font-semibold text-ink-50">{s.name}</div>
       <div className="mb-2 flex flex-wrap items-center gap-1.5 text-sm capitalize text-ink-400">
         <span>{subtitle}</span>
@@ -197,6 +197,22 @@ function SpellCard({ data }: ShareRendererProps) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+function SpellCard({ data }: ShareRendererProps) {
+  // Multi-pin sends an array; tolerate a legacy single-spell object too.
+  const spells = (Array.isArray(data) ? data : [data]) as SpellShare[];
+  if (spells.length === 0) return null;
+  return (
+    <Section title={spells.length > 1 ? "Spells" : "Spell"}>
+      <div className="divide-y divide-ink-800">
+        {spells.map((s) => (
+          <div key={s.id} className="py-3 first:pt-0 last:pb-0">
+            <SpellBody s={s} />
+          </div>
+        ))}
+      </div>
     </Section>
   );
 }

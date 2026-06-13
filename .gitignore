@@ -9,6 +9,9 @@ build/
 .env.local
 .env.*.local
 
+# offline voice-search models (large; downloaded per-deployment)
+apps/web/public/models/
+
 # runtime data
 apps/server/data/
 *.db
@@ -28,3 +31,5 @@ npm-debug.log*
 Thumbs.db
 
 .claude
+# downloaded voice-model archives (large, per-deployment)
+model/

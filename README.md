@@ -56,6 +56,20 @@ The GM app ships several built-in themes (dark + light), a custom-theme editor
 whole app — widgets included. To add or customize themes, see
 [`apps/web/src/theme/README.md`](apps/web/src/theme/README.md).
 
+## Voice search (Spells widget)
+Say a spell name to open it. Two engines, picked automatically:
+
+- **Chrome / Edge / Safari** use the built-in Web Speech API — nothing to set up.
+- **Firefox** has no Web Speech API, so it uses an **offline** WASM engine (Vosk).
+  This keeps everything local (no cloud, no API key). To enable it:
+  1. Download a model, e.g. [`vosk-model-small-en-us-0.15`](https://alphacephei.com/vosk/models)
+     (~40 MB) and place the `.tar.gz` in `apps/web/public/models/` (git-ignored).
+  2. Set `VITE_VOSK_MODEL_URL=/models/vosk-model-small-en-us-0.15.tar.gz` in `.env`.
+
+  The model downloads into the browser on first use. Until it's configured, the
+  Firefox mic button stays disabled and explains what to do. Voice search needs a
+  secure context (HTTPS or `localhost`) in every browser.
+
 ## Backup / restore
 Hit `GET /api/admin/export` while logged in. The server uses `VACUUM INTO` to take a hot copy of the SQLite DB and streams it back with the `uploads/` folder zipped alongside.
 
