@@ -11,16 +11,20 @@ const idParams = z.object({ id: z.string().min(1) });
 
 export const npcRoutes: FastifyPluginAsync = async (app) => {
   // Library is library-wide (cross-campaign); filter via query.
-  app.get("/", async (req) => {
+  app.get("/", async (req, reply) => {
     const q = listNpcsQuery.parse(req.query);
     const search = q.q?.trim();
     const conditions: Prisma.NPCWhereInput[] = [];
     if (q.campaignId) {
+      if (!(await app.assertCampaignDm(req, reply, q.campaignId))) return;
       conditions.push(
         q.includeGlobal
           ? { OR: [{ campaignId: q.campaignId }, { campaignId: null }] }
           : { campaignId: q.campaignId },
       );
+    } else {
+      // No campaign requested → restrict to the shared global library only.
+      conditions.push({ campaignId: null });
     }
     if (q.favorite) conditions.push({ favorite: true });
     if (search) {
@@ -44,6 +48,7 @@ export const npcRoutes: FastifyPluginAsync = async (app) => {
 
   app.post("/", async (req, reply) => {
     const body = createNpcInput.parse(req.body);
+    if (!(await app.assertCampaignDm(req, reply, body.campaignId))) return;
     const created = await prisma.nPC.create({
       data: {
         name: body.name,
@@ -67,15 +72,21 @@ export const npcRoutes: FastifyPluginAsync = async (app) => {
     return dto;
   });
 
-  app.get("/:id", async (req) => {
+  app.get("/:id", async (req, reply) => {
     const { id } = idParams.parse(req.params);
-    const row = await prisma.nPC.findUniqueOrThrow({ where: { id } });
+    const row = await prisma.nPC.findUnique({ where: { id } });
+    if (!row) return reply.code(404).send({ error: { code: "not_found", message: "NPC not found." } });
+    if (!(await app.assertCampaignDm(req, reply, row.campaignId))) return;
     return toNpcDto(row);
   });
 
-  app.patch("/:id", async (req) => {
+  app.patch("/:id", async (req, reply) => {
     const { id } = idParams.parse(req.params);
     const body = updateNpcInput.parse(req.body);
+    const existing = await prisma.nPC.findUnique({ where: { id } });
+    if (!existing) return reply.code(404).send({ error: { code: "not_found", message: "NPC not found." } });
+    if (!(await app.assertCampaignDm(req, reply, existing.campaignId))) return;
+    if (body.campaignId !== undefined && !(await app.assertCampaignDm(req, reply, body.campaignId))) return;
     const updated = await prisma.nPC.update({
       where: { id },
       data: {
@@ -109,6 +120,9 @@ export const npcRoutes: FastifyPluginAsync = async (app) => {
 
   app.delete("/:id", async (req, reply) => {
     const { id } = idParams.parse(req.params);
+    const existing = await prisma.nPC.findUnique({ where: { id } });
+    if (!existing) return reply.code(404).send({ error: { code: "not_found", message: "NPC not found." } });
+    if (!(await app.assertCampaignDm(req, reply, existing.campaignId))) return;
     const row = await prisma.nPC.delete({ where: { id } });
     if (row.campaignId) {
       await writeLog(app, row.campaignId, "npc.delete", `Deleted NPC: ${row.name}`);

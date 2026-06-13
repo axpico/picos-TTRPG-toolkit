@@ -22,6 +22,9 @@ model User {
   memberships  Membership[]
   characters   PartyMember[]
   diceRolls    DiceRoll[]
+  spells       Spell[]       @relation("UserSpell")
+  npcs         NPC[]         @relation("UserNpc")
+  monsters     Monster[]     @relation("UserMonster")
 }
 
 model Membership {
@@ -140,6 +143,8 @@ model NPC {
   id              String     @id @default(cuid())
   campaignId      String?
   campaign        Campaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  ownerUserId     String?
+  owner           User?      @relation("UserNpc", fields: [ownerUserId], references: [id], onDelete: Cascade)
   name            String
   role            String?
   quirk           String?
@@ -153,12 +158,16 @@ model NPC {
   statsJson       String     @default("{}")
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
+
+  @@index([ownerUserId])
 }
 
 model Monster {
   id          String   @id @default(cuid())
   campaignId  String?
   campaign    Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  ownerUserId String?
+  owner       User?    @relation("UserMonster", fields: [ownerUserId], references: [id], onDelete: Cascade)
   name        String
   type        String?
   environment String?
@@ -168,12 +177,16 @@ model Monster {
   tagsJson    String   @default("[]")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([ownerUserId])
 }
 
 model Spell {
   id            String    @id @default(cuid())
   campaignId    String?
   campaign      Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  ownerUserId   String?
+  owner         User?     @relation("UserSpell", fields: [ownerUserId], references: [id], onDelete: Cascade)
   name          String
   // Wikidot page slug for imported spells; null for custom ones. SQLite
   // treats NULLs as distinct, so many custom spells coexist with the unique index.
@@ -193,6 +206,8 @@ model Spell {
   tagsJson      String    @default("[]")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  @@index([ownerUserId])
 }
 
 model Location {

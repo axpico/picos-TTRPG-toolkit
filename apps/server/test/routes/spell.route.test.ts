@@ -40,10 +40,8 @@ const prisma = {
       calls.findMany.push(args);
       return store.spells;
     },
-    findUniqueOrThrow: async ({ where }: { where: { id: string } }) => {
-      const row = store.spells.find((s) => s.id === where.id);
-      if (!row) throw new Error("not found");
-      return row;
+    findUnique: async ({ where }: { where: { id: string } }) => {
+      return store.spells.find((s) => s.id === where.id) ?? null;
     },
     create: async ({ data }: { data: Row }) => {
       const row = seedSpell(data);
@@ -94,7 +92,12 @@ mock.module("../../src/lib/spell-import/importer.js", { namedExports: importerMo
 const { spellRoutes } = await import("../../src/routes/spell.js");
 const Fastify = (await import("fastify")).default;
 
-async function buildApp() {
+// Stand-in for the session plugin's `assertCampaignDm`. Default allows all so the
+// CRUD tests stay focused; pass `false` to simulate a non-DM and assert the guard.
+type Guard = (req: unknown, reply: { code: (n: number) => { send: (b: unknown) => unknown } }, campaignId: string | null | undefined) => Promise<boolean>;
+const allowAll: Guard = async () => true;
+
+async function buildApp(assertCampaignDm: Guard = allowAll) {
   const app = Fastify();
   const bus: SseBus = {
     emit: (campaignId, event) => {
@@ -105,9 +108,16 @@ async function buildApp() {
     trackPresence: () => () => {},
   };
   app.decorate("bus", bus);
+  app.decorate("assertCampaignDm", assertCampaignDm);
   await app.register(spellRoutes, { prefix: "/api/spells" });
   return app;
 }
+
+// Denies access and replies 403 — mirrors the real helper's failure path.
+const denyAll: Guard = async (_req, reply) => {
+  reply.code(403).send({ error: { code: "forbidden", message: "denied" } });
+  return false;
+};
 
 beforeEach(() => {
   store.spells = [];
@@ -194,6 +204,47 @@ test("DELETE /api/spells/:id returns 204", async () => {
   const res = await app.inject({ method: "DELETE", url: "/api/spells/s1" });
   assert.equal(res.statusCode, 204);
   assert.equal(store.spells.length, 0);
+});
+
+test("GET /api/spells without campaignId restricts to the global library", async () => {
+  const app = await buildApp();
+  const res = await app.inject({ method: "GET", url: "/api/spells" });
+  assert.equal(res.statusCode, 200);
+  const where = calls.findMany[0]?.where as { AND: Row[] };
+  assert.deepEqual(where.AND[0], { campaignId: null });
+});
+
+test("GET /api/spells?campaignId=X is rejected for a non-DM of X", async () => {
+  const app = await buildApp(denyAll);
+  const res = await app.inject({ method: "GET", url: "/api/spells?campaignId=c2" });
+  assert.equal(res.statusCode, 403);
+  assert.equal(calls.findMany.length, 0); // short-circuited before querying
+});
+
+test("PATCH /api/spells/:id is rejected for a non-DM of the spell's campaign", async () => {
+  store.spells = [seedSpell({ id: "s1", campaignId: "c1" })];
+  const app = await buildApp(denyAll);
+  const res = await app.inject({
+    method: "PATCH",
+    url: "/api/spells/s1",
+    payload: { range: "90 feet" },
+  });
+  assert.equal(res.statusCode, 403);
+  assert.equal(calls.updates.length, 0);
+});
+
+test("DELETE /api/spells/:id is rejected for a non-DM of the spell's campaign", async () => {
+  store.spells = [seedSpell({ id: "s1", campaignId: "c1" })];
+  const app = await buildApp(denyAll);
+  const res = await app.inject({ method: "DELETE", url: "/api/spells/s1" });
+  assert.equal(res.statusCode, 403);
+  assert.equal(store.spells.length, 1); // not deleted
+});
+
+test("GET /api/spells/:id returns 404 for a missing spell", async () => {
+  const app = await buildApp();
+  const res = await app.inject({ method: "GET", url: "/api/spells/nope" });
+  assert.equal(res.statusCode, 404);
 });
 
 test("POST /api/spells/import starts a job, then 409s while running", async () => {

@@ -60,6 +60,40 @@ declare module "fastify" {
     ) => (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
     /** Require the user to be a DM in at least one campaign (cross-campaign tools). */
     requireAnyDm: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    /**
+     * Per-row authorization for shared-library routes (spells/npcs/monsters):
+     * a `null`/`undefined` campaignId is the shared global library (allowed for
+     * any DM); a campaign-scoped row requires the caller to be that campaign's DM.
+     * Returns `true` when allowed; on failure sends the 401/403 reply and returns
+     * `false` so the caller can early-return.
+     */
+    assertCampaignDm: (
+      req: FastifyRequest,
+      reply: FastifyReply,
+      campaignId: string | null | undefined,
+    ) => Promise<boolean>;
+    /** Resolve the logged-in user's id (loads `req.user` if needed). */
+    getUserId: (req: FastifyRequest) => Promise<string | null>;
+    /**
+     * Read authorization for a library row. Campaign rows require DM membership;
+     * a `null`-owner row is the shared read-only seed (readable by any DM); an
+     * owned library row is readable only by its owner.
+     */
+    assertCanReadRow: (
+      req: FastifyRequest,
+      reply: FastifyReply,
+      row: { campaignId: string | null; ownerUserId: string | null },
+    ) => Promise<boolean>;
+    /**
+     * Write authorization for a library row. Campaign rows require DM membership;
+     * library rows are writable only by their owner. Seed rows (`null` owner) and
+     * other users' rows are not writable.
+     */
+    assertCanWriteRow: (
+      req: FastifyRequest,
+      reply: FastifyReply,
+      row: { campaignId: string | null; ownerUserId: string | null },
+    ) => Promise<boolean>;
   }
   interface FastifyRequest {
     user: SessionUser | null;
@@ -142,6 +176,27 @@ const plugin: FastifyPluginAsync = async (app: FastifyInstance) => {
     const count = await prisma.membership.count({ where: { userId: user.id, role: "dm" } });
     if (count === 0) return forbidden(reply);
   });
+
+  app.decorate(
+    "assertCampaignDm",
+    async (req: FastifyRequest, reply: FastifyReply, campaignId: string | null | undefined) => {
+      if (!campaignId) return true; // global library — shared across all DMs
+      const user = await loadUser(req);
+      if (!user) {
+        unauthorized(reply);
+        return false;
+      }
+      const m = await prisma.membership.findUnique({
+        where: { userId_campaignId: { userId: user.id, campaignId } },
+        select: { role: true },
+      });
+      if (!m || m.role !== "dm") {
+        forbidden(reply);
+        return false;
+      }
+      return true;
+    },
+  );
 };
 
 export const sessionPlugin = fp(plugin, { name: "session" });
