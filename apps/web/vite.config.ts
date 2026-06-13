@@ -22,6 +22,10 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    // The single root .env holds all config (incl. client VITE_* vars like
+    // VITE_VOSK_MODEL_URL); point Vite there so `import.meta.env` is populated
+    // from it instead of a separate apps/web/.env.
+    envDir: resolve(process.cwd(), "../../"),
     server: {
       // Prefer 5173 but fall back to the next free port instead of crashing.
       port: 5173,

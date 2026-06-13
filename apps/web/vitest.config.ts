@@ -10,5 +10,7 @@ export default defineConfig({
     environment: "jsdom",
     globals: false,
     include: ["test/**/*.test.{ts,tsx}"],
+    // Restore a working localStorage: jsdom-under-vitest on Node 22+ exposes none.
+    setupFiles: ["./test/setup.ts"],
   },
 });

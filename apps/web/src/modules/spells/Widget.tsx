@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import type { CreateSpellInput, Spell, UpdateSpellInput } from "@toolkit/shared";
 import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.js";
@@ -9,6 +9,7 @@ import { Modal } from "../../components/Modal.js";
 import { Markdown } from "../../components/Markdown.js";
 import { InlineConfirm, MetaChip, ScopeToggle, SearchInput, Tabs } from "../shared.js";
 import { useWidgetBroadcast } from "../broadcast/api.js";
+import { useToast } from "../../components/Toast.js";
 import {
   useCreateSpell,
   useDeleteSpell,
@@ -17,6 +18,7 @@ import {
   useStartImport,
   useUpdateSpell,
 } from "./api.js";
+import { findDuplicate } from "./dedup.js";
 import { buildIndex, matchSpellInTranscript } from "./match.js";
 import { useSpeechRecognition } from "./useSpeechRecognition.js";
 
@@ -72,10 +74,25 @@ function LibraryTab({ campaignId, broadcastKey }: { campaignId: string; broadcas
   const update = useUpdateSpell();
   const remove = useDeleteSpell();
 
-  // Spotlight: reveal a single spell to players via the widget's broadcast key.
-  const { active, payload, share } = useWidgetBroadcast(campaignId, broadcastKey ?? "spells");
-  const sharedSpellId =
-    active && typeof payload.spellId === "string" ? (payload.spellId as string) : null;
+  const toast = useToast();
+  // Multi-pin: reveal one or more spells to players via the widget's broadcast
+  // key. Pinned ids live in the broadcast payload; toggling rebuilds the list.
+  const { payload, share, stop } = useWidgetBroadcast(campaignId, broadcastKey ?? "spells");
+  const pinnedIds = useMemo<string[]>(() => {
+    const arr = payload.spellIds;
+    if (Array.isArray(arr)) return arr.filter((x): x is string => typeof x === "string");
+    return typeof payload.spellId === "string" ? [payload.spellId] : [];
+  }, [payload]);
+  const togglePin = useCallback(
+    (id: string) => {
+      const next = pinnedIds.includes(id)
+        ? pinnedIds.filter((x) => x !== id)
+        : [...pinnedIds, id];
+      if (next.length === 0) stop();
+      else share({ spellIds: next });
+    },
+    [pinnedIds, share, stop],
+  );
 
   // Voice search: match recent speech against the loaded spell names and pop
   // the detail view for a hit. Matching only ever selects — never broadcasts.
@@ -125,6 +142,11 @@ function LibraryTab({ campaignId, broadcastKey }: { campaignId: string; broadcas
             onChange={(e) => setKlass(e.target.value)}
           />
         </div>
+        {speech.loading && (
+          <div className="truncate text-xs italic text-ink-400" aria-live="polite">
+            ⏳ {speech.loadingDetail ?? "Loading offline voice model…"}
+          </div>
+        )}
         {speech.listening && (
           <div className="truncate text-xs italic text-ink-400" aria-live="polite">
             🎤 {speech.interim || speech.transcript.split(" ").slice(-8).join(" ") || "Listening…"}
@@ -135,9 +157,20 @@ function LibraryTab({ campaignId, broadcastKey }: { campaignId: string; broadcas
 
       {/* Action bar */}
       <div className="flex items-center justify-between gap-2 border-b border-ink-700 px-2 py-1.5">
-        <span className="text-xs text-ink-400">
-          {list.isLoading ? "Loading…" : `${count} ${count === 1 ? "spell" : "spells"}`}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-ink-400">
+            {list.isLoading ? "Loading…" : `${count} ${count === 1 ? "spell" : "spells"}`}
+          </span>
+          {pinnedIds.length > 0 && (
+            <button
+              className="chip border-accent-600/60 bg-accent-900/30 text-accent-300 hover:text-accent-200"
+              onClick={() => stop()}
+              title="Stop sharing all pinned spells with players"
+            >
+              ★ {pinnedIds.length} live — clear
+            </button>
+          )}
+        </div>
         <button
           className="btn-primary h-7 px-2.5 text-xs"
           onClick={() => create.mutate({ name: "New spell", campaignId, tags: [] })}
@@ -159,12 +192,22 @@ function LibraryTab({ campaignId, broadcastKey }: { campaignId: string; broadcas
             key={s.id}
             spell={s}
             campaignId={campaignId}
-            shared={sharedSpellId === s.id}
-            onShare={() => share({ spellId: s.id })}
+            shared={pinnedIds.includes(s.id)}
+            onShare={() => togglePin(s.id)}
             onOpen={() => setDetailId(s.id)}
             onChange={(input) => update.mutate({ id: s.id, input })}
             onDelete={() => remove.mutate(s.id)}
-            onCopy={(target) => create.mutate({ ...spellToCreateInput(s), campaignId: target })}
+            onCopy={(target) => {
+              const dup = findDuplicate(list.data ?? [], s.name, s.slug, target);
+              if (dup) {
+                toast(
+                  `"${s.name}" is already in ${target ? "this campaign" : "the library"}`,
+                  "info",
+                );
+                return;
+              }
+              create.mutate({ ...spellToCreateInput(s), campaignId: target });
+            }}
           />
         ))}
         {!list.isLoading && count === 0 && (
@@ -188,14 +231,30 @@ function LibraryTab({ campaignId, broadcastKey }: { campaignId: string; broadcas
 
 function MicButton({ speech }: { speech: ReturnType<typeof useSpeechRecognition> }) {
   if (!speech.supported) {
+    // `error` carries the specific reason (insecure context, or "configure the
+    // offline model" for Firefox); fall back to a neutral hint otherwise.
+    const reason = speech.error ?? "Voice search is unavailable in this browser";
     return (
       <button
         className="btn-ghost h-8 shrink-0 px-2 opacity-40"
         disabled
-        title="Voice search is not supported in this browser (try Chrome or Edge)"
-        aria-label="Voice search unavailable"
+        title={reason}
+        aria-label={`Voice search unavailable — ${reason}`}
       >
         🎤
+      </button>
+    );
+  }
+  if (speech.loading) {
+    // Offline (Vosk) engine downloading / initialising the model.
+    return (
+      <button
+        className="btn-ghost h-8 shrink-0 px-2"
+        disabled
+        title="Loading offline voice model…"
+        aria-label="Loading offline voice model"
+      >
+        <span className="animate-pulse">⏳</span>
       </button>
     );
   }

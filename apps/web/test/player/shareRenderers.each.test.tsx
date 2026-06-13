@@ -85,6 +85,49 @@ describe("share renderers", () => {
     expect(screen.getByText("Remember the password")).toBeTruthy();
   });
 
+  it("spells: renders an array of pinned spells under one section", () => {
+    const base = {
+      school: "evocation",
+      castingTime: "1 action",
+      range: "150 feet",
+      components: "V, S, M",
+      duration: "Instantaneous",
+      higherLevels: null,
+      classes: ["Wizard"],
+      ritual: false,
+      concentration: false,
+      source: "PHB",
+    };
+    renderShare("spells", [
+      { id: "a", name: "Fireball", level: 3, description: "Boom.", ...base },
+      { id: "b", name: "Mage Hand", level: 0, description: "A spectral hand.", ...base },
+    ]);
+    expect(screen.getByText("Spells")).toBeTruthy();
+    expect(screen.getByText("Fireball")).toBeTruthy();
+    expect(screen.getByText("Mage Hand")).toBeTruthy();
+  });
+
+  it("spells: tolerates a legacy single-spell object", () => {
+    renderShare("spells", {
+      id: "a",
+      name: "Bless",
+      level: 1,
+      school: "enchantment",
+      castingTime: "1 action",
+      range: "30 feet",
+      components: "V, S, M",
+      duration: "Concentration",
+      description: "Bless up to three creatures.",
+      higherLevels: null,
+      classes: ["Cleric"],
+      ritual: false,
+      concentration: true,
+      source: "PHB",
+    });
+    expect(screen.getByText("Spell")).toBeTruthy();
+    expect(screen.getByText("Bless")).toBeTruthy();
+  });
+
   it("falls back to a generic card for unknown types", () => {
     renderShare("mystery", {}, "mystery:w9");
     expect(screen.getByText(/The GM is sharing/)).toBeTruthy();
