@@ -19,8 +19,11 @@ async function buildMe(userId: string): Promise<AuthMe> {
   };
 }
 
+// Throttle credential endpoints: 10 attempts per minute per IP.
+const authRateLimit = { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } };
+
 export const authRoutes: FastifyPluginAsync = async (app) => {
-  app.post("/register", async (req, reply) => {
+  app.post("/register", authRateLimit, async (req, reply) => {
     const body = registerInput.parse(req.body);
     const existing = await prisma.user.findUnique({ where: { username: body.username } });
     if (existing) {
@@ -37,7 +40,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     return buildMe(user.id);
   });
 
-  app.post("/login", async (req, reply) => {
+  app.post("/login", authRateLimit, async (req, reply) => {
     const { username, password } = loginInput.parse(req.body);
     const user = await prisma.user.findUnique({ where: { username } });
     // Always run a compare to blunt username-enumeration timing differences.

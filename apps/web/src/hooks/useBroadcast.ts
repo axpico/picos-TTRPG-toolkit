@@ -68,6 +68,7 @@ const EVENT_TYPES = [
   "shop.update",
   "sessions.update",
   "presence.change",
+  "membership.change",
 ];
 
 const MAX_BACKOFF_MS = 30_000;
@@ -110,6 +111,12 @@ export function useBroadcast({ url, campaignId, onEvent, onStatus }: Options) {
       }
       if (event.type === "presence.change") {
         qc.invalidateQueries({ queryKey: ["presence", campaignId] });
+      }
+      if (event.type === "membership.change") {
+        // A member was added/removed/role-changed: refresh campaign + member lists.
+        qc.invalidateQueries({ queryKey: ["campaigns"] });
+        qc.invalidateQueries({ queryKey: ["campaign-members", campaignId] });
+        qc.invalidateQueries({ queryKey: ["auth"] }); // memberships live on /me
       }
       handlerRef.current?.(event);
     };

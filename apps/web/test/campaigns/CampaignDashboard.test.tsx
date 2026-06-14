@@ -65,7 +65,7 @@ function mount() {
   return render(
     <ToastProvider>
       <ConfirmProvider>
-        <MemoryRouter initialEntries={["/campaigns/camp"]}>
+        <MemoryRouter initialEntries={["/campaigns/camp"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Routes>
             <Route path="/campaigns/:campaignId" element={<CampaignDashboard />} />
           </Routes>

@@ -87,8 +87,8 @@ const importerMock = {
   }),
 };
 
-mock.module("../../src/db.js", { namedExports: { prisma } });
-mock.module("../../src/lib/spell-import/importer.js", { namedExports: importerMock });
+mock.module("../../src/db.js", { exports: { prisma } });
+mock.module("../../src/lib/spell-import/importer.js", { exports: importerMock });
 
 const { spellRoutes } = await import("../../src/routes/spell.js");
 const Fastify = (await import("fastify")).default;

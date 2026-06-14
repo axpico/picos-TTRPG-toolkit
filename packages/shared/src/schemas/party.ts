@@ -23,6 +23,26 @@ export const partyMember = z.object({
 });
 export type PartyMember = z.infer<typeof partyMember>;
 
+/**
+ * Player-safe projection of a party member. Strips DM/owner-private fields
+ * (`notes`, `gold`, `stats`, `playerName`) that the player view never renders.
+ * Sent to players via `player-state` and the gated party SSE events; a player's
+ * own full character comes from the separate `my-character` endpoint.
+ */
+export const publicPartyMember = partyMember.pick({
+  id: true,
+  campaignId: true,
+  userId: true,
+  name: true,
+  hp: true,
+  hpMax: true,
+  status: true,
+  conditions: true,
+  portraitAssetId: true,
+  order: true,
+});
+export type PublicPartyMember = z.infer<typeof publicPartyMember>;
+
 export const createPartyMemberInput = z.object({
   name: z.string().min(1).max(120),
   playerName: z.string().max(120).optional(),

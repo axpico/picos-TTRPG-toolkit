@@ -128,12 +128,24 @@ export const campaignRoutes: FastifyPluginAsync = async (app) => {
       where: { userId_campaignId: { userId, campaignId: id } },
       data: { role },
     });
+    // Lets open SSE streams for this member re-evaluate access (e.g. a demotion).
+    app.bus.emit(id, {
+      type: "membership.change",
+      campaignId: id,
+      payload: { userId: updated.userId, role: updated.role },
+    });
     return { userId: updated.userId, role: updated.role as Role };
   });
 
   app.delete("/:id/members/:userId", { preHandler: app.requireCampaignRole("dm") }, async (req, reply) => {
     const { id, userId } = memberParams.parse(req.params);
     await prisma.membership.delete({ where: { userId_campaignId: { userId, campaignId: id } } });
+    // role: null signals removal — open SSE streams for this member tear down.
+    app.bus.emit(id, {
+      type: "membership.change",
+      campaignId: id,
+      payload: { userId, role: null },
+    });
     reply.code(204).send();
   });
 };

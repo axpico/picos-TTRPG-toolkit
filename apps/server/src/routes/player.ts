@@ -7,7 +7,7 @@ import {
   type SSEEvent,
 } from "@toolkit/shared";
 import { prisma } from "../db.js";
-import { toPartyDto } from "../lib/repos/party.js";
+import { toPartyDto, toPublicPartyDto } from "../lib/repos/party.js";
 import { toEncounterDto } from "../lib/repos/combat.js";
 import { toWeatherDto } from "../lib/repos/weather.js";
 import { toCalendarDto } from "../lib/repos/calendar.js";
@@ -142,7 +142,7 @@ export const playerRoutes: FastifyPluginAsync = async (app) => {
       broadcasts: broadcasts.map(toBroadcastDto),
       widgets,
       data: {
-        party: active.has("party") ? party.map(toPartyDto) : null,
+        party: active.has("party") ? party.map(toPublicPartyDto) : null,
         combat: active.has("combat") && activeEncounter ? toEncounterDto(activeEncounter) : null,
         weather: active.has("weather") && weatherRow ? toWeatherDto(weatherRow) : null,
         calendar: active.has("calendar") && calendarRow ? toCalendarDto(calendarRow) : null,
@@ -173,14 +173,47 @@ export const playerRoutes: FastifyPluginAsync = async (app) => {
     await refresh();
 
     const filter = (event: SSEEvent) => {
-      if (event.type === "broadcast.change") return true;
       if (!event.broadcastKey) return false;
       return activeKeys.has(event.broadcastKey);
     };
 
+    let closed = false;
+    let cleanup = () => {};
+    const closeStream = () => {
+      if (closed) return;
+      closed = true;
+      cleanup();
+      try {
+        reply.raw.end();
+      } catch {
+        /* connection already gone */
+      }
+    };
+
     const unsubscribe = app.bus.subscribe(campaignId, reply, (event) => {
+      // GM-only revocation signal: tear down this stream if *this* member was
+      // removed from the campaign. Never forwarded to the player client.
+      if (event.type === "membership.change") {
+        const p = event.payload as { userId?: string; role?: string | null } | undefined;
+        if (p?.userId === req.user!.id && (p.role === null || p.role === undefined)) {
+          closeStream();
+        }
+        return false;
+      }
       if (event.type === "broadcast.change") {
-        void refresh();
+        // Keep activeKeys current synchronously from the payload so events that
+        // arrive right after a toggle aren't filtered against a stale set. The
+        // batch toggle carries no per-key info, so fall back to a DB refresh.
+        const p = event.payload as
+          | { batch?: boolean; widgetKey?: string; active?: boolean }
+          | undefined;
+        if (p?.batch || !event.broadcastKey) {
+          void refresh();
+        } else if (p?.active) {
+          activeKeys.add(event.broadcastKey);
+        } else {
+          activeKeys.delete(event.broadcastKey);
+        }
         return true;
       }
       return filter(event);
@@ -188,12 +221,12 @@ export const playerRoutes: FastifyPluginAsync = async (app) => {
     // Count this watcher so the GM dashboard can show live presence.
     const untrack = app.bus.trackPresence(campaignId);
 
-    const cleanup = () => {
+    cleanup = () => {
       untrack();
       unsubscribe();
     };
-    req.raw.on("close", cleanup);
-    req.raw.on("error", cleanup);
+    req.raw.on("close", closeStream);
+    req.raw.on("error", closeStream);
     return reply;
   });
 
@@ -227,11 +260,13 @@ export const playerRoutes: FastifyPluginAsync = async (app) => {
       },
     });
     const dto = toPartyDto(updated);
+    // This event reaches the player stream (broadcastKey "party"); ship only the
+    // player-safe projection. DM widgets refetch full data via query invalidation.
     app.bus.emit(campaignId, {
       type: "party.update",
       campaignId,
       broadcastKey: "party",
-      payload: { member: dto },
+      payload: { member: toPublicPartyDto(updated) },
     });
     await writeLog(app, campaignId, "party.update", `${dto.name} updated their character`);
     return dto;

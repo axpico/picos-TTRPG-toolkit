@@ -25,7 +25,7 @@ const prisma = {
   logEntry: { findMany: async () => store.logs },
 };
 
-mock.module("../../src/db.js", { namedExports: { prisma } });
+mock.module("../../src/db.js", { exports: { prisma } });
 
 const { getProjector } = await import("../../src/share/registry.js");
 

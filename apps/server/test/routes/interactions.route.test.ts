@@ -13,6 +13,9 @@ type Store = { item: Record<string, unknown> | null; member: Record<string, unkn
 const store: Store = { item: null, member: null, logs: [] };
 const emitted: { campaignId: string; event: { type: string; broadcastKey?: string; payload: unknown } }[] = [];
 
+type Guard = { gte?: number };
+type Delta = { decrement?: number };
+
 const prisma = {
   shopItem: {
     findUnique: async ({ where }: { where: { id: string } }) =>
@@ -23,6 +26,20 @@ const prisma = {
       (where.shopId === undefined || store.item.shopId === where.shopId)
         ? store.item
         : null,
+    findUniqueOrThrow: async ({ where }: { where: { id: string } }) => {
+      if (!store.item || store.item.id !== where.id) throw new Error("shopItem not found");
+      return store.item;
+    },
+    // Guarded atomic decrement: the WHERE re-asserts stock, mirroring the
+    // production race guard. Returns count:0 (no mutation) when the guard fails.
+    updateMany: async ({ where, data }: { where: { id: string; stock?: Guard }; data: { stock?: Delta } }) => {
+      if (!store.item || store.item.id !== where.id) return { count: 0 };
+      const gte = where.stock?.gte;
+      if (gte !== undefined && (store.item.stock as number) < gte) return { count: 0 };
+      const dec = data.stock?.decrement;
+      if (dec !== undefined) store.item = { ...store.item, stock: (store.item.stock as number) - dec };
+      return { count: 1 };
+    },
     update: ({ data }: { data: Record<string, unknown> }) => {
       store.item = { ...store.item, ...data };
       return store.item;
@@ -31,6 +48,18 @@ const prisma = {
   partyMember: {
     findUnique: async ({ where }: { where: { id: string } }) =>
       store.member && store.member.id === where.id ? store.member : null,
+    findUniqueOrThrow: async ({ where }: { where: { id: string } }) => {
+      if (!store.member || store.member.id !== where.id) throw new Error("partyMember not found");
+      return store.member;
+    },
+    updateMany: async ({ where, data }: { where: { id: string; gold?: Guard }; data: { gold?: Delta } }) => {
+      if (!store.member || store.member.id !== where.id) return { count: 0 };
+      const gte = where.gold?.gte;
+      if (gte !== undefined && (store.member.gold as number) < gte) return { count: 0 };
+      const dec = data.gold?.decrement;
+      if (dec !== undefined) store.member = { ...store.member, gold: (store.member.gold as number) - dec };
+      return { count: 1 };
+    },
     update: ({ data }: { data: Record<string, unknown> }) => {
       store.member = { ...store.member, ...data };
       return store.member;
@@ -44,10 +73,12 @@ const prisma = {
     },
     findMany: async () => store.logs,
   },
-  $transaction: async (ops: unknown[]) => Promise.all(ops),
+  // Support both the batched array form and the interactive callback form.
+  $transaction: async (arg: unknown) =>
+    typeof arg === "function" ? (arg as (tx: typeof prisma) => unknown)(prisma) : Promise.all(arg as unknown[]),
 };
 
-mock.module("../../src/db.js", { namedExports: { prisma } });
+mock.module("../../src/db.js", { exports: { prisma } });
 
 const { shopRoutes } = await import("../../src/routes/shop.js");
 const { logRoutes } = await import("../../src/routes/log.js");
@@ -208,6 +239,37 @@ test("not enough gold → 400 from resolvePurchase, no deduction", async () => {
   assert.equal(store.member!.gold, 50); // untouched
   assert.equal(store.logs.length, 0);
   await app.close();
+});
+
+test("TOCTOU: write-time stock guard rejects when a racer already drained stock", async () => {
+  // Committed stock is 1, but the initial read returns a stale snapshot (5) — as
+  // if a concurrent purchase decremented stock after this request read it. The
+  // pre-check (resolvePurchase) passes on the stale value; the guarded
+  // updateMany must still reject against the true committed stock.
+  store.item = seedItem({ stock: 1 });
+  store.member = seedMember({ gold: 500 });
+  const staleRead = { ...store.item, stock: 5 };
+  const realFindFirst = prisma.shopItem.findFirst;
+  prisma.shopItem.findFirst = async () => staleRead;
+
+  const app = buildApp();
+  await app.register(shopRoutes);
+  try {
+    const res = await app.inject({
+      method: "POST",
+      url: PURCHASE_URL,
+      payload: { memberId: "m1", quantity: 3 },
+    });
+
+    assert.equal(res.statusCode, 400);
+    assert.match(res.json().message, /Not enough stock/);
+    assert.equal(store.item!.stock, 1); // unchanged — no oversell
+    assert.equal(store.member!.gold, 500); // not charged
+    assert.equal(store.logs.length, 0);
+  } finally {
+    prisma.shopItem.findFirst = realFindFirst;
+    await app.close();
+  }
 });
 
 test("manual log entry writes a note and broadcasts log.append", async () => {

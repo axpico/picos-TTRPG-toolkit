@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { PartyMember as DbPartyMember } from "@prisma/client";
-import { toPartyDto } from "../../../src/lib/repos/party.js";
+import { toPartyDto, toPublicPartyDto } from "../../../src/lib/repos/party.js";
 
 const member = (over: Partial<DbPartyMember> = {}): DbPartyMember => ({
   id: "pm",
@@ -56,4 +56,29 @@ test("parses the stat block (empty default, or stored values)", () => {
   assert.equal(toPartyDto(member()).stats.ac, null);
   assert.equal(toPartyDto(member({ statsJson: '{"ac":17,"abilities":{"str":16}}' })).stats.ac, 17);
   assert.equal(toPartyDto(member({ statsJson: '{"abilities":{"str":16}}' })).stats.abilities.str, 16);
+});
+
+test("public DTO omits owner/DM-private fields (notes, gold, stats, playerName)", () => {
+  const dto = toPublicPartyDto(
+    member({
+      notes: "secret GM note",
+      gold: 999,
+      statsJson: '{"ac":17}',
+      playerName: "Sam",
+    }),
+  ) as Record<string, unknown>;
+  assert.equal("notes" in dto, false);
+  assert.equal("gold" in dto, false);
+  assert.equal("stats" in dto, false);
+  assert.equal("playerName" in dto, false);
+});
+
+test("public DTO keeps the player-visible fields", () => {
+  const dto = toPublicPartyDto(member({ userId: "u1", hp: 7, hpMax: 9, conditionsJson: '["blessed"]' }));
+  assert.equal(dto.name, "Aria");
+  assert.equal(dto.userId, "u1");
+  assert.equal(dto.hp, 7);
+  assert.equal(dto.hpMax, 9);
+  assert.equal(dto.status, "active");
+  assert.deepEqual(dto.conditions, ["blessed"]);
 });

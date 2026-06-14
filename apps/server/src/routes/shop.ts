@@ -10,7 +10,7 @@ import {
 } from "@toolkit/shared";
 import { prisma } from "../db.js";
 import { toShopDto, toShopItemDto } from "../lib/repos/shop.js";
-import { toPartyDto } from "../lib/repos/party.js";
+import { toPartyDto, toPublicPartyDto } from "../lib/repos/party.js";
 import { generateShop } from "../lib/shop-generator.js";
 import { resolvePurchase } from "../lib/shop-purchase.js";
 import { writeLog } from "../services/log.js";
@@ -171,23 +171,41 @@ export const shopRoutes: FastifyPluginAsync = async (app) => {
     });
     if (!calc.ok) throw fail(calc.status, calc.message);
 
-    const [updatedItem, updatedMember] = await prisma.$transaction([
-      prisma.shopItem.update({
-        where: { id: itemId },
-        data: calc.newStock !== null ? { stock: calc.newStock } : {},
-      }),
-      prisma.partyMember.update({
-        where: { id: memberId },
-        data: { gold: calc.newGold },
-      }),
-    ]);
+    // Atomic, guarded writes. The affordability/stock check above races against
+    // concurrent purchases (TOCTOU): two requests can both read the same stock
+    // and gold, both pass, and both commit — overselling stock or driving gold
+    // negative. Re-assert the preconditions inside each write's WHERE clause so
+    // only one of two racers succeeds; updateMany returns count=0 when the guard
+    // no longer holds, which rolls back the interactive transaction.
+    const { updatedItem, updatedMember } = await prisma.$transaction(async (tx) => {
+      if (item.stock !== null) {
+        const stockRes = await tx.shopItem.updateMany({
+          where: { id: itemId, stock: { gte: quantity } },
+          data: { stock: { decrement: quantity } },
+        });
+        if (stockRes.count === 0) throw fail(400, "Not enough stock.");
+      }
+      if (calc.total > 0) {
+        const goldRes = await tx.partyMember.updateMany({
+          where: { id: memberId, gold: { gte: calc.total } },
+          data: { gold: { decrement: calc.total } },
+        });
+        if (goldRes.count === 0) throw fail(400, "Not enough gold.");
+      }
+      const [refreshedItem, refreshedMember] = await Promise.all([
+        tx.shopItem.findUniqueOrThrow({ where: { id: itemId } }),
+        tx.partyMember.findUniqueOrThrow({ where: { id: memberId } }),
+      ]);
+      return { updatedItem: refreshedItem, updatedMember: refreshedMember };
+    });
 
     const memberDto = toPartyDto(updatedMember);
     app.bus.emit(id, {
       type: "party.update",
       campaignId: id,
       broadcastKey: "party",
-      payload: { member: memberDto },
+      // Reaches the player stream — ship only the player-safe projection.
+      payload: { member: toPublicPartyDto(updatedMember) },
     });
     emitShop(id, shopId);
     await writeLog(

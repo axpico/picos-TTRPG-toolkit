@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import rateLimit from "@fastify/rate-limit";
 import { env, isDev } from "./env.js";
 import { errorsPlugin } from "./plugins/errors.js";
 import { sessionPlugin } from "./plugins/session.js";
@@ -41,6 +42,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(errorsPlugin);
   await app.register(sessionPlugin);
   await app.register(ssePlugin);
+  // Opt-in rate limiting (global:false) — applied per-route on auth endpoints
+  // to blunt credential brute-forcing without throttling SSE/heartbeat traffic.
+  await app.register(rateLimit, { global: false });
 
   // Public endpoints: auth (register/login/logout/me) + asset reads (UUID-addressed).
   await app.register(authRoutes, { prefix: "/api/auth" });

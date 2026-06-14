@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { createPartyMemberInput, updatePartyMemberInput } from "@toolkit/shared";
 import { prisma } from "../db.js";
-import { toPartyDto } from "../lib/repos/party.js";
+import { toPartyDto, toPublicPartyDto } from "../lib/repos/party.js";
 import { writeLog } from "../services/log.js";
 
 const cidParams = z.object({ id: z.string().min(1) });
@@ -38,7 +38,7 @@ export const partyRoutes: FastifyPluginAsync = async (app) => {
       },
     });
     const dto = toPartyDto(created);
-    app.bus.emit(id, { type: "party.create", campaignId: id, broadcastKey: "party", payload: { member: dto } });
+    app.bus.emit(id, { type: "party.create", campaignId: id, broadcastKey: "party", payload: { member: toPublicPartyDto(created) } });
     await writeLog(app, id, "party.create", `Added party member: ${dto.name}`);
     reply.code(201);
     return dto;
@@ -68,7 +68,7 @@ export const partyRoutes: FastifyPluginAsync = async (app) => {
       },
     });
     const dto = toPartyDto(updated);
-    app.bus.emit(id, { type: "party.update", campaignId: id, broadcastKey: "party", payload: { member: dto } });
+    app.bus.emit(id, { type: "party.update", campaignId: id, broadcastKey: "party", payload: { member: toPublicPartyDto(updated) } });
     await writeLog(app, id, "party.update", `Updated party member: ${dto.name}`);
     return dto;
   });

@@ -30,7 +30,7 @@ const prisma = {
   },
 };
 
-mock.module("../../src/db.js", { namedExports: { prisma } });
+mock.module("../../src/db.js", { exports: { prisma } });
 
 const { partyRoutes } = await import("../../src/routes/party.js");
 const Fastify = (await import("fastify")).default;

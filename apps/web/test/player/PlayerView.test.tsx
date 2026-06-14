@@ -69,7 +69,7 @@ function playerState(over: Partial<PlayerState> = {}): PlayerState {
 function mount() {
   return render(
     <ToastProvider>
-      <MemoryRouter initialEntries={["/play/camp"]}>
+      <MemoryRouter initialEntries={["/play/camp"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           <Route path="/play/:campaignId" element={<PlayerView />} />
         </Routes>
