@@ -43,9 +43,11 @@ export const rollTableRoutes: FastifyPluginAsync = async (app) => {
     return toRollTableDto(created);
   });
 
-  app.patch("/:id/rolltables/:tableId", async (req) => {
-    const { tableId } = tableParams.parse(req.params);
+  app.patch("/:id/rolltables/:tableId", async (req, reply) => {
+    const { id, tableId } = tableParams.parse(req.params);
     const body = updateRollTableInput.parse(req.body);
+    const owned = await prisma.rollTable.findFirst({ where: { id: tableId, campaignId: id }, select: { id: true } });
+    if (!owned) return reply.code(404).send({ error: { code: "not_found", message: "Table not found." } });
     const updated = await prisma.rollTable.update({
       where: { id: tableId },
       data: {
@@ -58,7 +60,9 @@ export const rollTableRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.delete("/:id/rolltables/:tableId", async (req, reply) => {
-    const { tableId } = tableParams.parse(req.params);
+    const { id, tableId } = tableParams.parse(req.params);
+    const owned = await prisma.rollTable.findFirst({ where: { id: tableId, campaignId: id }, select: { id: true } });
+    if (!owned) return reply.code(404).send({ error: { code: "not_found", message: "Table not found." } });
     await prisma.rollTable.delete({ where: { id: tableId } });
     reply.code(204).send();
   });

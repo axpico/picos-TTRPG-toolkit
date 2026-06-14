@@ -17,13 +17,22 @@ function resolveDbPath(): string {
 }
 
 export const adminRoutes: FastifyPluginAsync = async (app) => {
+  // The export dumps the entire multi-tenant database (every user's data and
+  // password hashes) + all uploads, so it must never be reachable by "any DM".
+  // Restrict to the single configured server operator; fail closed when unset.
+  const requireAdmin = async (req: import("fastify").FastifyRequest, reply: import("fastify").FastifyReply) => {
+    if (!env.ADMIN_USERNAME || req.user?.username !== env.ADMIN_USERNAME) {
+      return reply.code(403).send({ error: { code: "forbidden", message: "Admin only." } });
+    }
+  };
+
   /**
    * Hot-copy the SQLite database via VACUUM INTO, then stream a zip containing
    * the copy plus the uploads directory. Safe to call while the server is
    * serving traffic — VACUUM INTO holds a read lock briefly but does not block
    * readers.
    */
-  app.get("/export", async (_req, reply) => {
+  app.get("/export", { preHandler: requireAdmin }, async (_req, reply) => {
     const dbPath = resolveDbPath();
     const uploadDir = resolve(env.UPLOAD_DIR);
 

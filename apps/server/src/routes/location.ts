@@ -43,15 +43,18 @@ export const locationRoutes: FastifyPluginAsync = async (app) => {
     return dto;
   });
 
-  app.get("/:id/locations/:locationId", async (req) => {
-    const { locationId } = itemParams.parse(req.params);
-    const row = await prisma.location.findUniqueOrThrow({ where: { id: locationId } });
+  app.get("/:id/locations/:locationId", async (req, reply) => {
+    const { id, locationId } = itemParams.parse(req.params);
+    const row = await prisma.location.findFirst({ where: { id: locationId, campaignId: id } });
+    if (!row) return reply.code(404).send({ error: { code: "not_found", message: "Location not found." } });
     return toLocationDto(row);
   });
 
-  app.patch("/:id/locations/:locationId", async (req) => {
+  app.patch("/:id/locations/:locationId", async (req, reply) => {
     const { id, locationId } = itemParams.parse(req.params);
     const body = updateLocationInput.parse(req.body);
+    const owned = await prisma.location.findFirst({ where: { id: locationId, campaignId: id }, select: { id: true } });
+    if (!owned) return reply.code(404).send({ error: { code: "not_found", message: "Location not found." } });
     const updated = await prisma.location.update({
       where: { id: locationId },
       data: {
@@ -81,14 +84,16 @@ export const locationRoutes: FastifyPluginAsync = async (app) => {
 
   app.delete("/:id/locations/:locationId", async (req, reply) => {
     const { id, locationId } = itemParams.parse(req.params);
-    const row = await prisma.location.delete({ where: { id: locationId } });
+    const owned = await prisma.location.findFirst({ where: { id: locationId, campaignId: id }, select: { id: true, name: true } });
+    if (!owned) return reply.code(404).send({ error: { code: "not_found", message: "Location not found." } });
+    await prisma.location.delete({ where: { id: locationId } });
     app.bus.emit(id, {
       type: "location.update",
       campaignId: id,
       broadcastKey: "map:current",
-      payload: { id: row.id, deleted: true },
+      payload: { id: owned.id, deleted: true },
     });
-    await writeLog(app, id, "location.delete", `Deleted location: ${row.name}`);
+    await writeLog(app, id, "location.delete", `Deleted location: ${owned.name}`);
     reply.code(204).send();
   });
 };

@@ -55,15 +55,18 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
     return dto;
   });
 
-  app.get("/:id/sessions/:sessionId", async (req) => {
-    const { sessionId } = sessParams.parse(req.params);
-    const row = await prisma.session.findUniqueOrThrow({ where: { id: sessionId } });
+  app.get("/:id/sessions/:sessionId", async (req, reply) => {
+    const { id, sessionId } = sessParams.parse(req.params);
+    const row = await prisma.session.findFirst({ where: { id: sessionId, campaignId: id } });
+    if (!row) return reply.code(404).send({ error: { code: "not_found", message: "Session not found." } });
     return toSessionDto(row);
   });
 
-  app.patch("/:id/sessions/:sessionId", async (req) => {
+  app.patch("/:id/sessions/:sessionId", async (req, reply) => {
     const { id, sessionId } = sessParams.parse(req.params);
     const body = updateSessionInput.parse(req.body);
+    const owned = await prisma.session.findFirst({ where: { id: sessionId, campaignId: id }, select: { id: true } });
+    if (!owned) return reply.code(404).send({ error: { code: "not_found", message: "Session not found." } });
     const updated = await prisma.session.update({
       where: { id: sessionId },
       data: {
@@ -91,8 +94,10 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
 
   app.delete("/:id/sessions/:sessionId", async (req, reply) => {
     const { id, sessionId } = sessParams.parse(req.params);
-    const row = await prisma.session.delete({ where: { id: sessionId } });
-    await writeLog(app, id, "session.delete", `Deleted session: ${row.title}`);
+    const owned = await prisma.session.findFirst({ where: { id: sessionId, campaignId: id }, select: { id: true, title: true } });
+    if (!owned) return reply.code(404).send({ error: { code: "not_found", message: "Session not found." } });
+    await prisma.session.delete({ where: { id: sessionId } });
+    await writeLog(app, id, "session.delete", `Deleted session: ${owned.title}`);
     reply.code(204).send();
   });
 };

@@ -10,6 +10,9 @@ const envSchema = z.object({
   SESSION_KEY: z.string().optional(),
   GM_PASSWORD: z.string().min(1).optional(),
   GM_USERNAME: z.string().min(1).default("gm"),
+  // Username of the single server operator allowed to run the full-database
+  // export. Unset = export disabled (fail closed) — never "any DM".
+  ADMIN_USERNAME: z.string().min(1).optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

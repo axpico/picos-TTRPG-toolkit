@@ -55,18 +55,21 @@ export const shopRoutes: FastifyPluginAsync = async (app) => {
     return toShopDto(created);
   });
 
-  app.get("/:id/shops/:shopId", async (req) => {
-    const { shopId } = shopParams.parse(req.params);
-    const row = await prisma.shop.findUniqueOrThrow({
-      where: { id: shopId },
+  app.get("/:id/shops/:shopId", async (req, reply) => {
+    const { id, shopId } = shopParams.parse(req.params);
+    const row = await prisma.shop.findFirst({
+      where: { id: shopId, campaignId: id },
       include: { items: true },
     });
+    if (!row) return reply.code(404).send({ error: { code: "not_found", message: "Shop not found." } });
     return toShopDto(row);
   });
 
-  app.patch("/:id/shops/:shopId", async (req) => {
+  app.patch("/:id/shops/:shopId", async (req, reply) => {
     const { id, shopId } = shopParams.parse(req.params);
     const body = updateShopInput.parse(req.body);
+    const owned = await prisma.shop.findFirst({ where: { id: shopId, campaignId: id }, select: { id: true } });
+    if (!owned) return reply.code(404).send({ error: { code: "not_found", message: "Shop not found." } });
     const updated = await prisma.shop.update({
       where: { id: shopId },
       data: {
@@ -82,8 +85,10 @@ export const shopRoutes: FastifyPluginAsync = async (app) => {
 
   app.delete("/:id/shops/:shopId", async (req, reply) => {
     const { id, shopId } = shopParams.parse(req.params);
-    const row = await prisma.shop.delete({ where: { id: shopId } });
-    await writeLog(app, id, "shop.delete", `Deleted shop: ${row.name}`);
+    const owned = await prisma.shop.findFirst({ where: { id: shopId, campaignId: id }, select: { id: true, name: true } });
+    if (!owned) return reply.code(404).send({ error: { code: "not_found", message: "Shop not found." } });
+    await prisma.shop.delete({ where: { id: shopId } });
+    await writeLog(app, id, "shop.delete", `Deleted shop: ${owned.name}`);
     reply.code(204).send();
   });
 
@@ -91,6 +96,8 @@ export const shopRoutes: FastifyPluginAsync = async (app) => {
   app.post("/:id/shops/:shopId/items", async (req, reply) => {
     const { id, shopId } = shopParams.parse(req.params);
     const body = createShopItemInput.parse(req.body);
+    const shopOwned = await prisma.shop.findFirst({ where: { id: shopId, campaignId: id }, select: { id: true } });
+    if (!shopOwned) return reply.code(404).send({ error: { code: "not_found", message: "Shop not found." } });
     const created = await prisma.shopItem.create({
       data: {
         shopId,
@@ -107,9 +114,11 @@ export const shopRoutes: FastifyPluginAsync = async (app) => {
     return toShopItemDto(created);
   });
 
-  app.patch("/:id/shops/:shopId/items/:itemId", async (req) => {
+  app.patch("/:id/shops/:shopId/items/:itemId", async (req, reply) => {
     const { id, shopId, itemId } = itemParams.parse(req.params);
     const body = updateShopItemInput.parse(req.body);
+    const owned = await prisma.shopItem.findFirst({ where: { id: itemId, shopId, shop: { campaignId: id } }, select: { id: true } });
+    if (!owned) return reply.code(404).send({ error: { code: "not_found", message: "Item not found." } });
     const updated = await prisma.shopItem.update({
       where: { id: itemId },
       data: {
@@ -127,6 +136,8 @@ export const shopRoutes: FastifyPluginAsync = async (app) => {
 
   app.delete("/:id/shops/:shopId/items/:itemId", async (req, reply) => {
     const { id, shopId, itemId } = itemParams.parse(req.params);
+    const owned = await prisma.shopItem.findFirst({ where: { id: itemId, shopId, shop: { campaignId: id } }, select: { id: true } });
+    if (!owned) return reply.code(404).send({ error: { code: "not_found", message: "Item not found." } });
     await prisma.shopItem.delete({ where: { id: itemId } });
     emitShop(id, shopId);
     reply.code(204).send();
@@ -145,8 +156,10 @@ export const shopRoutes: FastifyPluginAsync = async (app) => {
       return err;
     };
 
-    const item = await prisma.shopItem.findUnique({ where: { id: itemId } });
-    if (!item || item.shopId !== shopId) throw fail(404, "Item not found.");
+    const item = await prisma.shopItem.findFirst({
+      where: { id: itemId, shopId, shop: { campaignId: id } },
+    });
+    if (!item) throw fail(404, "Item not found.");
     const member = await prisma.partyMember.findUnique({ where: { id: memberId } });
     if (!member || member.campaignId !== id) throw fail(404, "Party member not found.");
 

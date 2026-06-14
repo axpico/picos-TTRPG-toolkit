@@ -6,6 +6,7 @@ import { toNpcDto } from "../../../src/lib/repos/npc.js";
 const npc = (over: Partial<DbNpc> = {}): DbNpc => ({
   id: "npc",
   campaignId: "camp",
+  ownerUserId: null,
   name: "Garrik",
   role: "smith",
   quirk: null,

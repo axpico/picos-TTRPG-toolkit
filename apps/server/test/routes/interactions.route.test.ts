@@ -17,6 +17,12 @@ const prisma = {
   shopItem: {
     findUnique: async ({ where }: { where: { id: string } }) =>
       store.item && store.item.id === where.id ? store.item : null,
+    findFirst: async ({ where }: { where: { id: string; shopId?: string } }) =>
+      store.item &&
+      store.item.id === where.id &&
+      (where.shopId === undefined || store.item.shopId === where.shopId)
+        ? store.item
+        : null,
     update: ({ data }: { data: Record<string, unknown> }) => {
       store.item = { ...store.item, ...data };
       return store.item;

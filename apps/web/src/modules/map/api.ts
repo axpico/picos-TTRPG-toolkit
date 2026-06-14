@@ -79,8 +79,9 @@ export function useDeleteLocation(campaignId: string) {
   });
 }
 
-export function useUploadAsset() {
+export function useUploadAsset(campaignId: string) {
   return useMutation({
-    mutationFn: (file: File) => api.upload<Asset>(`/api/uploads/upload`, file),
+    mutationFn: (file: File) =>
+      api.upload<Asset>(`/api/uploads/upload?campaignId=${encodeURIComponent(campaignId)}`, file),
   });
 }

@@ -11,21 +11,28 @@ const idParams = z.object({ id: z.string().min(1) });
 const importBody = z.object({ includeUnofficial: z.boolean().optional() }).optional();
 
 export const spellRoutes: FastifyPluginAsync = async (app) => {
+  // The library a given user may see: the shared read-only seed (null owner)
+  // plus their own private rows. Never another user's library.
+  const libraryVisibleTo = (uid: string | null): Prisma.SpellWhereInput => ({
+    campaignId: null,
+    OR: [{ ownerUserId: null }, ...(uid ? [{ ownerUserId: uid }] : [])],
+  });
+
   app.get("/", async (req, reply) => {
     const q = listSpellsQuery.parse(req.query);
+    const uid = await app.getUserId(req);
     const search = q.q?.trim();
     const conditions: Prisma.SpellWhereInput[] = [];
     if (q.campaignId) {
       if (!(await app.assertCampaignDm(req, reply, q.campaignId))) return;
       conditions.push(
         q.includeGlobal
-          ? { OR: [{ campaignId: q.campaignId }, { campaignId: null }] }
+          ? { OR: [{ campaignId: q.campaignId }, libraryVisibleTo(uid)] }
           : { campaignId: q.campaignId },
       );
     } else {
-      // No campaign requested → restrict to the shared global library only,
-      // never every campaign's private spells.
-      conditions.push({ campaignId: null });
+      // No campaign requested → library view: shared seed + the caller's own rows.
+      conditions.push(libraryVisibleTo(uid));
     }
     if (q.level !== undefined) conditions.push({ level: q.level });
     if (q.school) conditions.push({ school: q.school });
@@ -56,6 +63,10 @@ export const spellRoutes: FastifyPluginAsync = async (app) => {
   app.post("/", async (req, reply) => {
     const body = createSpellInput.parse(req.body);
     if (!(await app.assertCampaignDm(req, reply, body.campaignId))) return;
+    const uid = await app.getUserId(req);
+    // Campaign rows are campaign-controlled (null owner); library rows are owned
+    // by their creator so they stay private to that user.
+    const ownerUserId = body.campaignId ? null : uid;
     const created = await prisma.spell.create({
       data: {
         name: body.name,
@@ -73,6 +84,7 @@ export const spellRoutes: FastifyPluginAsync = async (app) => {
         source: body.source ?? null,
         tagsJson: JSON.stringify(body.tags ?? []),
         campaignId: body.campaignId ?? null,
+        ownerUserId,
       },
     });
     const dto = toSpellDto(created);
@@ -87,7 +99,7 @@ export const spellRoutes: FastifyPluginAsync = async (app) => {
     const { id } = idParams.parse(req.params);
     const row = await prisma.spell.findUnique({ where: { id } });
     if (!row) return reply.code(404).send({ error: { code: "not_found", message: "Spell not found." } });
-    if (!(await app.assertCampaignDm(req, reply, row.campaignId))) return;
+    if (!(await app.assertCanReadRow(req, reply, row))) return;
     return toSpellDto(row);
   });
 
@@ -96,9 +108,19 @@ export const spellRoutes: FastifyPluginAsync = async (app) => {
     const body = updateSpellInput.parse(req.body);
     const existing = await prisma.spell.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: { code: "not_found", message: "Spell not found." } });
-    if (!(await app.assertCampaignDm(req, reply, existing.campaignId))) return;
-    // Moving a spell into a campaign requires DM rights on the destination too.
-    if (body.campaignId !== undefined && !(await app.assertCampaignDm(req, reply, body.campaignId))) return;
+    if (!(await app.assertCanWriteRow(req, reply, existing))) return;
+    // When the campaign changes, re-authorize the destination and re-derive owner:
+    // → a campaign requires DM rights there (campaign-owned, null owner);
+    // → the library re-homes the row to the caller (owner-private).
+    let ownerPatch: { ownerUserId?: string | null } = {};
+    if (body.campaignId !== undefined) {
+      if (body.campaignId) {
+        if (!(await app.assertCampaignDm(req, reply, body.campaignId))) return;
+        ownerPatch = { ownerUserId: null };
+      } else {
+        ownerPatch = { ownerUserId: await app.getUserId(req) };
+      }
+    }
     const updated = await prisma.spell.update({
       where: { id },
       data: {
@@ -117,6 +139,7 @@ export const spellRoutes: FastifyPluginAsync = async (app) => {
         ...(body.source !== undefined ? { source: body.source ?? null } : {}),
         ...(body.tags !== undefined ? { tagsJson: JSON.stringify(body.tags) } : {}),
         ...(body.campaignId !== undefined ? { campaignId: body.campaignId ?? null } : {}),
+        ...ownerPatch,
       },
     });
     const dto = toSpellDto(updated);
@@ -136,7 +159,7 @@ export const spellRoutes: FastifyPluginAsync = async (app) => {
     const { id } = idParams.parse(req.params);
     const existing = await prisma.spell.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: { code: "not_found", message: "Spell not found." } });
-    if (!(await app.assertCampaignDm(req, reply, existing.campaignId))) return;
+    if (!(await app.assertCanWriteRow(req, reply, existing))) return;
     const row = await prisma.spell.delete({ where: { id } });
     if (row.campaignId) {
       await writeLog(app, row.campaignId, "spell.delete", `Deleted spell: ${row.name}`);

@@ -53,9 +53,11 @@ export const timerRoutes: FastifyPluginAsync = async (app) => {
     return dto;
   });
 
-  app.patch("/:id/timers/:timerId", async (req) => {
+  app.patch("/:id/timers/:timerId", async (req, reply) => {
     const { id, timerId } = timerParams.parse(req.params);
     const body = updateTimerInput.parse(req.body);
+    const owned = await prisma.timer.findFirst({ where: { id: timerId, campaignId: id }, select: { id: true } });
+    if (!owned) return reply.code(404).send({ error: { code: "not_found", message: "Timer not found." } });
     const updated = await prisma.timer.update({
       where: { id: timerId },
       data: {
@@ -77,9 +79,11 @@ export const timerRoutes: FastifyPluginAsync = async (app) => {
 
   app.delete("/:id/timers/:timerId", async (req, reply) => {
     const { id, timerId } = timerParams.parse(req.params);
-    const row = await prisma.timer.delete({ where: { id: timerId } });
-    emit(app, id, "timer.delete", { id: row.id });
-    await writeLog(app, id, "timer.delete", `Deleted timer: ${row.name}`);
+    const owned = await prisma.timer.findFirst({ where: { id: timerId, campaignId: id }, select: { id: true, name: true } });
+    if (!owned) return reply.code(404).send({ error: { code: "not_found", message: "Timer not found." } });
+    await prisma.timer.delete({ where: { id: timerId } });
+    emit(app, id, "timer.delete", { id: owned.id });
+    await writeLog(app, id, "timer.delete", `Deleted timer: ${owned.name}`);
     reply.code(204).send();
   });
 };

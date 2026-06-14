@@ -6,6 +6,7 @@ import { toMonsterDto } from "../../../src/lib/repos/monster.js";
 const monster = (over: Partial<DbMonster> = {}): DbMonster => ({
   id: "mon",
   campaignId: "camp",
+  ownerUserId: null,
   name: "Owlbear",
   type: "beast",
   environment: "forest",

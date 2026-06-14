@@ -36,6 +36,10 @@ export const fileUploadRoutes: FastifyPluginAsync = async (app) => {
   await mkdir(uploadDir, { recursive: true });
 
   app.post("/upload", async (req, reply) => {
+    // Scope the asset to a campaign the uploader DMs so reads can be gated by
+    // membership. Missing campaignId → legacy/unscoped (any authed user may read).
+    const campaignId = (req.query as { campaignId?: string }).campaignId;
+    if (!(await app.assertCampaignDm(req, reply, campaignId))) return;
     const file = await req.file();
     if (!file) {
       reply.code(400).send({ error: { code: "no_file", message: "No file uploaded." } });
@@ -63,6 +67,7 @@ export const fileUploadRoutes: FastifyPluginAsync = async (app) => {
     const row = await prisma.asset.create({
       data: {
         id,
+        campaignId: campaignId ?? null,
         filename: onDisk,
         mime,
         size: buf.byteLength,
@@ -81,8 +86,10 @@ export const fileUploadRoutes: FastifyPluginAsync = async (app) => {
 };
 
 /**
- * Public retrieval. Asset IDs are UUIDs (high entropy) and serving them
- * publicly lets the player view render maps/portraits without a session cookie.
+ * Authenticated retrieval. Reads require a logged-in user; campaign-scoped assets
+ * additionally require membership of that campaign, so one tenant's maps/portraits
+ * are not readable by others. The player view sends its session cookie with the
+ * `<img>` request, so members still render images without an explicit fetch.
  */
 export const fileReadRoutes: FastifyPluginAsync = async (app) => {
   const uploadDir = resolve(env.UPLOAD_DIR);
@@ -94,6 +101,7 @@ export const fileReadRoutes: FastifyPluginAsync = async (app) => {
       reply.code(404).send({ error: { code: "not_found", message: "Asset not found." } });
       return;
     }
+    if (!(await app.assertCampaignMember(req, reply, row.campaignId))) return;
     const fullPath = join(uploadDir, row.filename);
     try {
       const s = await stat(fullPath);

@@ -9,20 +9,27 @@ import { writeLog } from "../services/log.js";
 const idParams = z.object({ id: z.string().min(1) });
 
 export const monsterRoutes: FastifyPluginAsync = async (app) => {
+  // Library a given user may see: shared read-only seed (null owner) + own rows.
+  const libraryVisibleTo = (uid: string | null): Prisma.MonsterWhereInput => ({
+    campaignId: null,
+    OR: [{ ownerUserId: null }, ...(uid ? [{ ownerUserId: uid }] : [])],
+  });
+
   app.get("/", async (req, reply) => {
     const q = listMonstersQuery.parse(req.query);
+    const uid = await app.getUserId(req);
     const search = q.q?.trim();
     const conditions: Prisma.MonsterWhereInput[] = [];
     if (q.campaignId) {
       if (!(await app.assertCampaignDm(req, reply, q.campaignId))) return;
       conditions.push(
         q.includeGlobal
-          ? { OR: [{ campaignId: q.campaignId }, { campaignId: null }] }
+          ? { OR: [{ campaignId: q.campaignId }, libraryVisibleTo(uid)] }
           : { campaignId: q.campaignId },
       );
     } else {
-      // No campaign requested → restrict to the shared global library only.
-      conditions.push({ campaignId: null });
+      // No campaign requested → library view: shared seed + the caller's own rows.
+      conditions.push(libraryVisibleTo(uid));
     }
     if (q.type) conditions.push({ type: q.type });
     if (q.environment) conditions.push({ environment: q.environment });
@@ -48,6 +55,8 @@ export const monsterRoutes: FastifyPluginAsync = async (app) => {
   app.post("/", async (req, reply) => {
     const body = createMonsterInput.parse(req.body);
     if (!(await app.assertCampaignDm(req, reply, body.campaignId))) return;
+    const uid = await app.getUserId(req);
+    const ownerUserId = body.campaignId ? null : uid;
     const created = await prisma.monster.create({
       data: {
         name: body.name,
@@ -58,6 +67,7 @@ export const monsterRoutes: FastifyPluginAsync = async (app) => {
         notes: body.notes ?? null,
         tagsJson: JSON.stringify(body.tags ?? []),
         campaignId: body.campaignId ?? null,
+        ownerUserId,
       },
     });
     const dto = toMonsterDto(created);
@@ -72,7 +82,7 @@ export const monsterRoutes: FastifyPluginAsync = async (app) => {
     const { id } = idParams.parse(req.params);
     const row = await prisma.monster.findUnique({ where: { id } });
     if (!row) return reply.code(404).send({ error: { code: "not_found", message: "Creature not found." } });
-    if (!(await app.assertCampaignDm(req, reply, row.campaignId))) return;
+    if (!(await app.assertCanReadRow(req, reply, row))) return;
     return toMonsterDto(row);
   });
 
@@ -81,8 +91,16 @@ export const monsterRoutes: FastifyPluginAsync = async (app) => {
     const body = updateMonsterInput.parse(req.body);
     const existing = await prisma.monster.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: { code: "not_found", message: "Creature not found." } });
-    if (!(await app.assertCampaignDm(req, reply, existing.campaignId))) return;
-    if (body.campaignId !== undefined && !(await app.assertCampaignDm(req, reply, body.campaignId))) return;
+    if (!(await app.assertCanWriteRow(req, reply, existing))) return;
+    let ownerPatch: { ownerUserId?: string | null } = {};
+    if (body.campaignId !== undefined) {
+      if (body.campaignId) {
+        if (!(await app.assertCampaignDm(req, reply, body.campaignId))) return;
+        ownerPatch = { ownerUserId: null };
+      } else {
+        ownerPatch = { ownerUserId: await app.getUserId(req) };
+      }
+    }
     const updated = await prisma.monster.update({
       where: { id },
       data: {
@@ -94,6 +112,7 @@ export const monsterRoutes: FastifyPluginAsync = async (app) => {
         ...(body.notes !== undefined ? { notes: body.notes ?? null } : {}),
         ...(body.tags !== undefined ? { tagsJson: JSON.stringify(body.tags) } : {}),
         ...(body.campaignId !== undefined ? { campaignId: body.campaignId ?? null } : {}),
+        ...ownerPatch,
       },
     });
     const dto = toMonsterDto(updated);
@@ -113,7 +132,7 @@ export const monsterRoutes: FastifyPluginAsync = async (app) => {
     const { id } = idParams.parse(req.params);
     const existing = await prisma.monster.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: { code: "not_found", message: "Creature not found." } });
-    if (!(await app.assertCampaignDm(req, reply, existing.campaignId))) return;
+    if (!(await app.assertCanWriteRow(req, reply, existing))) return;
     const row = await prisma.monster.delete({ where: { id } });
     if (row.campaignId) {
       await writeLog(app, row.campaignId, "monster.delete", `Deleted creature: ${row.name}`);

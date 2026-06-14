@@ -52,9 +52,11 @@ export const clockRoutes: FastifyPluginAsync = async (app) => {
     return dto;
   });
 
-  app.patch("/:id/clocks/:clockId", async (req) => {
+  app.patch("/:id/clocks/:clockId", async (req, reply) => {
     const { id, clockId } = clockParams.parse(req.params);
     const body = updateClockInput.parse(req.body);
+    const owned = await prisma.progressClock.findFirst({ where: { id: clockId, campaignId: id }, select: { id: true } });
+    if (!owned) return reply.code(404).send({ error: { code: "not_found", message: "Clock not found." } });
     const updated = await prisma.progressClock.update({
       where: { id: clockId },
       data: {
@@ -74,9 +76,11 @@ export const clockRoutes: FastifyPluginAsync = async (app) => {
 
   app.delete("/:id/clocks/:clockId", async (req, reply) => {
     const { id, clockId } = clockParams.parse(req.params);
-    const row = await prisma.progressClock.delete({ where: { id: clockId } });
-    emit(app, id, "clock.delete", { id: row.id });
-    await writeLog(app, id, "clock.delete", `Deleted clock: ${row.name}`);
+    const owned = await prisma.progressClock.findFirst({ where: { id: clockId, campaignId: id }, select: { id: true, name: true } });
+    if (!owned) return reply.code(404).send({ error: { code: "not_found", message: "Clock not found." } });
+    await prisma.progressClock.delete({ where: { id: clockId } });
+    emit(app, id, "clock.delete", { id: owned.id });
+    await writeLog(app, id, "clock.delete", `Deleted clock: ${owned.name}`);
     reply.code(204).send();
   });
 };

@@ -44,9 +44,11 @@ export const partyRoutes: FastifyPluginAsync = async (app) => {
     return dto;
   });
 
-  app.patch("/:id/party/:memberId", async (req) => {
+  app.patch("/:id/party/:memberId", async (req, reply) => {
     const { id, memberId } = memberParams.parse(req.params);
     const body = updatePartyMemberInput.parse(req.body);
+    const owned = await prisma.partyMember.findFirst({ where: { id: memberId, campaignId: id }, select: { id: true } });
+    if (!owned) return reply.code(404).send({ error: { code: "not_found", message: "Party member not found." } });
     const updated = await prisma.partyMember.update({
       where: { id: memberId },
       data: {
@@ -73,9 +75,11 @@ export const partyRoutes: FastifyPluginAsync = async (app) => {
 
   app.delete("/:id/party/:memberId", async (req, reply) => {
     const { id, memberId } = memberParams.parse(req.params);
-    const row = await prisma.partyMember.delete({ where: { id: memberId } });
-    app.bus.emit(id, { type: "party.delete", campaignId: id, broadcastKey: "party", payload: { id: row.id } });
-    await writeLog(app, id, "party.delete", `Removed party member: ${row.name}`);
+    const owned = await prisma.partyMember.findFirst({ where: { id: memberId, campaignId: id }, select: { id: true, name: true } });
+    if (!owned) return reply.code(404).send({ error: { code: "not_found", message: "Party member not found." } });
+    await prisma.partyMember.delete({ where: { id: memberId } });
+    app.bus.emit(id, { type: "party.delete", campaignId: id, broadcastKey: "party", payload: { id: owned.id } });
+    await writeLog(app, id, "party.delete", `Removed party member: ${owned.name}`);
     reply.code(204).send();
   });
 };

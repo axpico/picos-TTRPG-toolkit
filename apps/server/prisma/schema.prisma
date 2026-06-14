@@ -67,6 +67,7 @@ model Campaign {
   clocks       ProgressClock[]
   timers       Timer[]
   rollTables   RollTable[]
+  assets       Asset[]
 }
 
 model Layout {
@@ -93,11 +94,15 @@ model Broadcast {
 }
 
 model Asset {
-  id        String   @id @default(cuid())
-  filename  String
-  mime      String
-  size      Int
-  createdAt DateTime @default(now())
+  id         String    @id @default(cuid())
+  campaignId String?
+  campaign   Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  filename   String
+  mime       String
+  size       Int
+  createdAt  DateTime  @default(now())
+
+  @@index([campaignId])
 }
 
 model PartyMember {

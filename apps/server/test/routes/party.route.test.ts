@@ -12,6 +12,10 @@ const updates: Row[] = [];
 
 const prisma = {
   partyMember: {
+    findFirst: async ({ where }: { where: { id: string; campaignId: string } }) =>
+      store.member.id === where.id && store.member.campaignId === where.campaignId
+        ? store.member
+        : null,
     update: async ({ data }: { data: Row }) => {
       updates.push(data);
       store.member = { ...store.member, ...data };

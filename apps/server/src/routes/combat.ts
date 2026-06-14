@@ -31,6 +31,15 @@ function emit(app: import("fastify").FastifyInstance, campaignId: string, type: 
 }
 
 export const combatRoutes: FastifyPluginAsync = async (app) => {
+  // Load an encounter only if it belongs to the given campaign. Prevents
+  // cross-campaign access via a foreign encounterId on a campaign route the
+  // caller legitimately DMs.
+  const loadEncounter = (encounterId: string, campaignId: string) =>
+    prisma.encounter.findFirst({
+      where: { id: encounterId, campaignId },
+      include: { combatants: true },
+    });
+
   app.get("/:id/encounters", async (req) => {
     const { id } = cidParams.parse(req.params);
     const rows = await prisma.encounter.findMany({
@@ -55,10 +64,11 @@ export const combatRoutes: FastifyPluginAsync = async (app) => {
     return dto;
   });
 
-  app.patch("/:id/encounters/:encounterId", async (req) => {
+  app.patch("/:id/encounters/:encounterId", async (req, reply) => {
     const { id, encounterId } = encParams.parse(req.params);
     const body = updateEncounterInput.parse(req.body);
-    const before = await prisma.encounter.findUniqueOrThrow({ where: { id: encounterId } });
+    const before = await loadEncounter(encounterId, id);
+    if (!before) return reply.code(404).send({ error: { code: "not_found", message: "Encounter not found." } });
     const updated = await prisma.encounter.update({
       where: { id: encounterId },
       data: {
@@ -96,18 +106,18 @@ export const combatRoutes: FastifyPluginAsync = async (app) => {
 
   app.delete("/:id/encounters/:encounterId", async (req, reply) => {
     const { id, encounterId } = encParams.parse(req.params);
-    const row = await prisma.encounter.delete({ where: { id: encounterId } });
-    emit(app, id, "combat.delete", { id: row.id });
-    await writeLog(app, id, "combat.delete", `Deleted encounter: ${row.name}`);
+    const owned = await prisma.encounter.findFirst({ where: { id: encounterId, campaignId: id }, select: { id: true, name: true } });
+    if (!owned) return reply.code(404).send({ error: { code: "not_found", message: "Encounter not found." } });
+    await prisma.encounter.delete({ where: { id: encounterId } });
+    emit(app, id, "combat.delete", { id: owned.id });
+    await writeLog(app, id, "combat.delete", `Deleted encounter: ${owned.name}`);
     reply.code(204).send();
   });
 
-  app.post("/:id/encounters/:encounterId/next-turn", async (req) => {
+  app.post("/:id/encounters/:encounterId/next-turn", async (req, reply) => {
     const { id, encounterId } = encParams.parse(req.params);
-    const enc = await prisma.encounter.findUniqueOrThrow({
-      where: { id: encounterId },
-      include: { combatants: true },
-    });
+    const enc = await loadEncounter(encounterId, id);
+    if (!enc) return reply.code(404).send({ error: { code: "not_found", message: "Encounter not found." } });
     const total = enc.combatants.length;
     if (total === 0) {
       return toEncounterDto(enc);
@@ -136,6 +146,8 @@ export const combatRoutes: FastifyPluginAsync = async (app) => {
   app.post("/:id/encounters/:encounterId/combatants", async (req, reply) => {
     const { id, encounterId } = encParams.parse(req.params);
     const body = createCombatantInput.parse(req.body);
+    const ownedEnc = await prisma.encounter.findFirst({ where: { id: encounterId, campaignId: id }, select: { id: true } });
+    if (!ownedEnc) return reply.code(404).send({ error: { code: "not_found", message: "Encounter not found." } });
     const count = await prisma.combatant.count({ where: { encounterId } });
     const created = await prisma.combatant.create({
       data: {
@@ -163,9 +175,11 @@ export const combatRoutes: FastifyPluginAsync = async (app) => {
     return toCombatantDto(created);
   });
 
-  app.patch("/:id/encounters/:encounterId/combatants/:combatantId", async (req) => {
+  app.patch("/:id/encounters/:encounterId/combatants/:combatantId", async (req, reply) => {
     const { id, encounterId, combatantId } = combatantParams.parse(req.params);
     const body = updateCombatantInput.parse(req.body);
+    const ownedC = await prisma.combatant.findFirst({ where: { id: combatantId, encounterId, encounter: { campaignId: id } }, select: { id: true } });
+    if (!ownedC) return reply.code(404).send({ error: { code: "not_found", message: "Combatant not found." } });
     const updated = await prisma.combatant.update({
       where: { id: combatantId },
       data: {
@@ -194,6 +208,8 @@ export const combatRoutes: FastifyPluginAsync = async (app) => {
 
   app.delete("/:id/encounters/:encounterId/combatants/:combatantId", async (req, reply) => {
     const { id, encounterId, combatantId } = combatantParams.parse(req.params);
+    const ownedC = await prisma.combatant.findFirst({ where: { id: combatantId, encounterId, encounter: { campaignId: id } }, select: { id: true } });
+    if (!ownedC) return reply.code(404).send({ error: { code: "not_found", message: "Combatant not found." } });
     const removed = await prisma.combatant.delete({ where: { id: combatantId } });
     let enc = await prisma.encounter.findUniqueOrThrow({
       where: { id: encounterId },
@@ -215,12 +231,10 @@ export const combatRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Step the turn marker backwards (wrapping to the previous round).
-  app.post("/:id/encounters/:encounterId/prev-turn", async (req) => {
+  app.post("/:id/encounters/:encounterId/prev-turn", async (req, reply) => {
     const { id, encounterId } = encParams.parse(req.params);
-    const enc = await prisma.encounter.findUniqueOrThrow({
-      where: { id: encounterId },
-      include: { combatants: true },
-    });
+    const enc = await loadEncounter(encounterId, id);
+    if (!enc) return reply.code(404).send({ error: { code: "not_found", message: "Encounter not found." } });
     const total = enc.combatants.length;
     if (total === 0) return toEncounterDto(enc);
     let nextTurn = enc.currentTurn - 1;
@@ -240,13 +254,11 @@ export const combatRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Roll 1d20 initiative for every combatant (optionally NPCs only).
-  app.post("/:id/encounters/:encounterId/roll-initiative", async (req) => {
+  app.post("/:id/encounters/:encounterId/roll-initiative", async (req, reply) => {
     const { id, encounterId } = encParams.parse(req.params);
     const body = z.object({ onlyNpc: z.boolean().optional() }).parse(req.body ?? {});
-    const enc = await prisma.encounter.findUniqueOrThrow({
-      where: { id: encounterId },
-      include: { combatants: true },
-    });
+    const enc = await loadEncounter(encounterId, id);
+    if (!enc) return reply.code(404).send({ error: { code: "not_found", message: "Encounter not found." } });
     const targets = body.onlyNpc ? enc.combatants.filter((c) => !c.isPC) : enc.combatants;
     await prisma.$transaction(
       targets.map((c) =>

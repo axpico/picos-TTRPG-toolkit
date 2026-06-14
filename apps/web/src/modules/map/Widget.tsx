@@ -67,7 +67,7 @@ function MapWidget({ campaignId, state, setState }: WidgetContext) {
   const create = useCreateLocation(campaignId);
   const update = useUpdateLocation(campaignId);
   const remove = useDeleteLocation(campaignId);
-  const upload = useUploadAsset();
+  const upload = useUploadAsset(campaignId);
   const broadcasts = useBroadcasts(campaignId);
   const setBroadcast = useSetBroadcast(campaignId);
 

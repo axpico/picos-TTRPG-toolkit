@@ -72,6 +72,16 @@ declare module "fastify" {
       reply: FastifyReply,
       campaignId: string | null | undefined,
     ) => Promise<boolean>;
+    /**
+     * Require the caller to be a member (any role) of the given campaign. A
+     * `null`/`undefined` campaignId means "not campaign-scoped" → allowed for any
+     * authenticated user. Returns `true` when allowed; otherwise replies and `false`.
+     */
+    assertCampaignMember: (
+      req: FastifyRequest,
+      reply: FastifyReply,
+      campaignId: string | null | undefined,
+    ) => Promise<boolean>;
     /** Resolve the logged-in user's id (loads `req.user` if needed). */
     getUserId: (req: FastifyRequest) => Promise<string | null>;
     /**
@@ -177,24 +187,106 @@ const plugin: FastifyPluginAsync = async (app: FastifyInstance) => {
     if (count === 0) return forbidden(reply);
   });
 
+  const isDmOf = async (userId: string, campaignId: string): Promise<boolean> => {
+    const m = await prisma.membership.findUnique({
+      where: { userId_campaignId: { userId, campaignId } },
+      select: { role: true },
+    });
+    return !!m && m.role === "dm";
+  };
+
   app.decorate(
     "assertCampaignDm",
     async (req: FastifyRequest, reply: FastifyReply, campaignId: string | null | undefined) => {
-      if (!campaignId) return true; // global library — shared across all DMs
+      if (!campaignId) return true; // library scope — ownership is enforced per-row
       const user = await loadUser(req);
       if (!user) {
         unauthorized(reply);
         return false;
       }
-      const m = await prisma.membership.findUnique({
-        where: { userId_campaignId: { userId: user.id, campaignId } },
-        select: { role: true },
-      });
-      if (!m || m.role !== "dm") {
+      if (!(await isDmOf(user.id, campaignId))) {
         forbidden(reply);
         return false;
       }
       return true;
+    },
+  );
+
+  app.decorate("getUserId", async (req: FastifyRequest) => {
+    const user = await loadUser(req);
+    return user?.id ?? null;
+  });
+
+  app.decorate(
+    "assertCampaignMember",
+    async (req: FastifyRequest, reply: FastifyReply, campaignId: string | null | undefined) => {
+      const user = await loadUser(req);
+      if (!user) {
+        unauthorized(reply);
+        return false;
+      }
+      if (!campaignId) return true; // not campaign-scoped — any authed user
+      const m = await prisma.membership.findUnique({
+        where: { userId_campaignId: { userId: user.id, campaignId } },
+        select: { role: true },
+      });
+      if (!m) {
+        forbidden(reply);
+        return false;
+      }
+      return true;
+    },
+  );
+
+  app.decorate(
+    "assertCanReadRow",
+    async (
+      req: FastifyRequest,
+      reply: FastifyReply,
+      row: { campaignId: string | null; ownerUserId: string | null },
+    ) => {
+      const user = await loadUser(req);
+      if (!user) {
+        unauthorized(reply);
+        return false;
+      }
+      if (row.campaignId) {
+        if (!(await isDmOf(user.id, row.campaignId))) {
+          forbidden(reply);
+          return false;
+        }
+        return true;
+      }
+      // Library row: shared seed (null owner) is readable; otherwise owner-only.
+      if (row.ownerUserId === null || row.ownerUserId === user.id) return true;
+      forbidden(reply);
+      return false;
+    },
+  );
+
+  app.decorate(
+    "assertCanWriteRow",
+    async (
+      req: FastifyRequest,
+      reply: FastifyReply,
+      row: { campaignId: string | null; ownerUserId: string | null },
+    ) => {
+      const user = await loadUser(req);
+      if (!user) {
+        unauthorized(reply);
+        return false;
+      }
+      if (row.campaignId) {
+        if (!(await isDmOf(user.id, row.campaignId))) {
+          forbidden(reply);
+          return false;
+        }
+        return true;
+      }
+      // Library row: only the owner may write. Seed (null) is read-only.
+      if (row.ownerUserId === user.id) return true;
+      forbidden(reply);
+      return false;
     },
   );
 };
