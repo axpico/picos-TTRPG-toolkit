@@ -1,5 +1,6 @@
 import { useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import clsx from "clsx";
+import { useToast } from "../components/Toast.js";
 
 /**
  * Button that disables itself and shows a spinner while a mutation is in
@@ -287,4 +288,62 @@ export function InlineConfirm({
       ×
     </button>
   );
+}
+
+export interface LibraryCopyButtonProps {
+  /** True when the row belongs to the global library (campaignId === null). */
+  isLibrary: boolean;
+  /** True when the row belongs to the current campaign. */
+  sameCampaign: boolean;
+  campaignId: string;
+  /** target = campaignId to import into the campaign; undefined to publish to the library. */
+  onCopy: (target: string | undefined) => void;
+  /** Singular noun for tooltips/feedback, e.g. "NPC", "creature", "spell". */
+  noun: string;
+}
+
+/**
+ * Copy a library/campaign entry between scopes. Library entries import into the
+ * current campaign; campaign entries publish to the shared library. Renders
+ * nothing for entries that belong to neither scope.
+ */
+export function LibraryCopyButton({
+  isLibrary,
+  sameCampaign,
+  campaignId,
+  onCopy,
+  noun,
+}: LibraryCopyButtonProps) {
+  const toast = useToast();
+  if (isLibrary)
+    return (
+      <button
+        type="button"
+        className="btn-ghost h-7 gap-1 px-2 text-xs text-accent-500 hover:text-accent-400"
+        onClick={() => {
+          onCopy(campaignId);
+          toast(`Imported ${noun} into this campaign.`, "success");
+        }}
+        title={`Copy this library ${noun} into the current campaign`}
+        aria-label={`Import ${noun} into campaign`}
+      >
+        ↘ Import
+      </button>
+    );
+  if (sameCampaign)
+    return (
+      <button
+        type="button"
+        className="btn-ghost h-7 gap-1 px-2 text-xs"
+        onClick={() => {
+          onCopy(undefined);
+          toast(`Published ${noun} to the shared library.`, "success");
+        }}
+        title={`Copy this ${noun} into the shared library`}
+        aria-label={`Publish ${noun} to library`}
+      >
+        ↗ Publish
+      </button>
+    );
+  return null;
 }

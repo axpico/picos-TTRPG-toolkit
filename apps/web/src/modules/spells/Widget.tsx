@@ -7,7 +7,7 @@ import { EmptyState } from "../../components/EmptyState.js";
 import { Skeleton } from "../../components/Skeleton.js";
 import { Modal } from "../../components/Modal.js";
 import { Markdown } from "../../components/Markdown.js";
-import { InlineConfirm, MetaChip, ScopeToggle, SearchInput, Tabs } from "../shared.js";
+import { InlineConfirm, LibraryCopyButton, MetaChip, ScopeToggle, SearchInput, Tabs } from "../shared.js";
 import { useWidgetBroadcast } from "../broadcast/api.js";
 import { useToast } from "../../components/Toast.js";
 import {
@@ -356,11 +356,12 @@ function SpellRow({ spell, campaignId, shared, onShare, onOpen, onChange, onDele
           </MetaChip>
         )}
         <div className="flex shrink-0 items-center gap-0.5">
-          <CopyButton
+          <LibraryCopyButton
             isLibrary={isLibrary}
             sameCampaign={spell.campaignId === campaignId}
             campaignId={campaignId}
             onCopy={onCopy}
+            noun="spell"
           />
           <button
             className={clsx(
@@ -499,41 +500,6 @@ function Field({
       />
     </label>
   );
-}
-
-/** Copy-between-scopes action; same pattern as the bestiary. */
-function CopyButton({
-  isLibrary,
-  sameCampaign,
-  campaignId,
-  onCopy,
-}: {
-  isLibrary: boolean;
-  sameCampaign: boolean;
-  campaignId: string;
-  onCopy: (target: string | undefined) => void;
-}) {
-  if (isLibrary)
-    return (
-      <button
-        className="btn-ghost h-7 gap-1 px-2 text-xs text-accent-500 hover:text-accent-400"
-        onClick={() => onCopy(campaignId)}
-        title="Copy this library spell into the current campaign"
-      >
-        ↘ Import
-      </button>
-    );
-  if (sameCampaign)
-    return (
-      <button
-        className="btn-ghost h-7 gap-1 px-2 text-xs"
-        onClick={() => onCopy(undefined)}
-        title="Copy this spell into the shared library"
-      >
-        ↗ Library
-      </button>
-    );
-  return null;
 }
 
 function SpellDetailModal({ spell, onClose }: { spell: Spell; onClose: () => void }) {

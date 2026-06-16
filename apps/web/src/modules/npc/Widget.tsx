@@ -5,7 +5,7 @@ import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.
 import { useWidgetState } from "../../canvas/useWidgetState.js";
 import { EmptyState } from "../../components/EmptyState.js";
 import { Skeleton } from "../../components/Skeleton.js";
-import { InlineConfirm, PendingButton, ScopeToggle, SearchInput, Tabs } from "../shared.js";
+import { InlineConfirm, LibraryCopyButton, PendingButton, ScopeToggle, SearchInput, Tabs } from "../shared.js";
 import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
 import { useWidgetBroadcast } from "../broadcast/api.js";
 import {
@@ -253,23 +253,13 @@ function NpcRow({ npc, campaignId, shared, onShare, onChange, onDelete, onCopy }
           ★
         </button>
         <div className="flex shrink-0 items-center gap-0.5">
-          {isLibrary ? (
-            <button
-              className="btn-ghost h-7 gap-1 px-2 text-xs text-accent-500 hover:text-accent-400"
-              onClick={() => onCopy(campaignId)}
-              title="Copy this library NPC into the current campaign"
-            >
-              ↘ Import
-            </button>
-          ) : npc.campaignId === campaignId ? (
-            <button
-              className="btn-ghost h-7 gap-1 px-2 text-xs"
-              onClick={() => onCopy(undefined)}
-              title="Copy this NPC into the shared library"
-            >
-              ↗ Library
-            </button>
-          ) : null}
+          <LibraryCopyButton
+            isLibrary={isLibrary}
+            sameCampaign={npc.campaignId === campaignId}
+            campaignId={campaignId}
+            onCopy={onCopy}
+            noun="NPC"
+          />
           <button
             className={clsx(
               "btn h-7 px-2 text-xs transition-colors",

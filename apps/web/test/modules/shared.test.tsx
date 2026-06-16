@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HpBar, InlineConfirm } from "../../src/modules/shared.js";
+import { HpBar, InlineConfirm, LibraryCopyButton } from "../../src/modules/shared.js";
 
 afterEach(cleanup);
 
@@ -51,5 +51,58 @@ describe("InlineConfirm", () => {
     expect(onConfirm).not.toHaveBeenCalled();
     // The trigger button is back.
     expect(screen.getByTitle("Remove")).toBeTruthy();
+  });
+});
+
+describe("LibraryCopyButton", () => {
+  it("imports a library entry into the campaign", async () => {
+    const user = userEvent.setup();
+    const onCopy = vi.fn();
+    render(
+      <LibraryCopyButton
+        isLibrary
+        sameCampaign={false}
+        campaignId="camp-1"
+        onCopy={onCopy}
+        noun="creature"
+      />,
+    );
+
+    const btn = screen.getByLabelText("Import creature into campaign");
+    expect(btn.textContent).toContain("Import");
+    await user.click(btn);
+    expect(onCopy).toHaveBeenCalledWith("camp-1");
+  });
+
+  it("publishes a campaign entry to the shared library", async () => {
+    const user = userEvent.setup();
+    const onCopy = vi.fn();
+    render(
+      <LibraryCopyButton
+        isLibrary={false}
+        sameCampaign
+        campaignId="camp-1"
+        onCopy={onCopy}
+        noun="spell"
+      />,
+    );
+
+    const btn = screen.getByLabelText("Publish spell to library");
+    expect(btn.textContent).toContain("Publish");
+    await user.click(btn);
+    expect(onCopy).toHaveBeenCalledWith(undefined);
+  });
+
+  it("renders nothing for an entry in neither scope", () => {
+    const { container } = render(
+      <LibraryCopyButton
+        isLibrary={false}
+        sameCampaign={false}
+        campaignId="camp-1"
+        onCopy={vi.fn()}
+        noun="NPC"
+      />,
+    );
+    expect(container.firstChild).toBeNull();
   });
 });

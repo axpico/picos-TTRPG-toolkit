@@ -12,7 +12,7 @@ import { registerWidget, type WidgetContext } from "../../canvas/WidgetRegistry.
 import { useWidgetState } from "../../canvas/useWidgetState.js";
 import { EmptyState } from "../../components/EmptyState.js";
 import { Skeleton } from "../../components/Skeleton.js";
-import { InlineConfirm, MetaChip, ScopeToggle, SearchInput, Tabs } from "../shared.js";
+import { InlineConfirm, LibraryCopyButton, MetaChip, ScopeToggle, SearchInput, Tabs } from "../shared.js";
 import { CreatureSheetModal } from "../../components/statblock/CreatureSheetModal.js";
 import { useWidgetBroadcast } from "../broadcast/api.js";
 import {
@@ -241,7 +241,13 @@ function MonsterRow({ monster, campaignId, shared, onShare, onChange, onDelete, 
           </MetaChip>
         )}
         <div className="flex shrink-0 items-center gap-0.5">
-          <CopyButton isLibrary={isLibrary} sameCampaign={monster.campaignId === campaignId} onCopy={onCopy} campaignId={campaignId} />
+          <LibraryCopyButton
+            isLibrary={isLibrary}
+            sameCampaign={monster.campaignId === campaignId}
+            campaignId={campaignId}
+            onCopy={onCopy}
+            noun="creature"
+          />
           <button
             className={clsx(
               "btn h-7 px-2 text-xs transition-colors",
@@ -357,41 +363,6 @@ function MonsterRow({ monster, campaignId, shared, onShare, onChange, onDelete, 
       )}
     </li>
   );
-}
-
-/** Copy-between-scopes action. Library entries import into the campaign; campaign entries publish to the library. */
-function CopyButton({
-  isLibrary,
-  sameCampaign,
-  campaignId,
-  onCopy,
-}: {
-  isLibrary: boolean;
-  sameCampaign: boolean;
-  campaignId: string;
-  onCopy: (target: string | undefined) => void;
-}) {
-  if (isLibrary)
-    return (
-      <button
-        className="btn-ghost h-7 gap-1 px-2 text-xs text-accent-500 hover:text-accent-400"
-        onClick={() => onCopy(campaignId)}
-        title="Copy this library creature into the current campaign"
-      >
-        ↘ Import
-      </button>
-    );
-  if (sameCampaign)
-    return (
-      <button
-        className="btn-ghost h-7 gap-1 px-2 text-xs"
-        onClick={() => onCopy(undefined)}
-        title="Copy this creature into the shared library"
-      >
-        ↗ Library
-      </button>
-    );
-  return null;
 }
 
 // A few generic, ownable creature name parts to flavor generated beasts.
